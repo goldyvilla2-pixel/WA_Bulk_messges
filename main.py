@@ -316,5 +316,6 @@ async def stop_task():
 
 if __name__ == "__main__":
     import uvicorn
+    ensure_dirs()
     start_bridge()
     uvicorn.run(app, host="0.0.0.0", port=8000)
