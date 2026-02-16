@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MASTODONITTECH (WA Bulk Message Shooter)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --primary: #38bdf8;
+            --secondary: #818cf8;
+            --text: #f8fafc;
+            --accent: #22d3ee;
+            --success: #4ade80;
+            --danger: #f87171;
+            --wa-bg: #e5ddd5;
+            --wa-msg: #dcf8c6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 480px 1fr;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- LEFT PANEL: CONTROLS --- */
+        .left-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            overflow-y: auto;
+        }
+
+        .logo-box {
+            margin-bottom: 0.5rem;
+        }
+
+        .logo-main {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.2;
+        }
+
+        .logo-sub {
+            font-size: 0.75rem;
+            color: var(--primary);
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent);
+            opacity: 0.8;
+            margin-bottom: 0.4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.7rem;
+            border-radius: 8px;
+            color: white;
+            outline: none;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: var(--primary);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .file-input-wrapper:hover {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .file-input-wrapper input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .clear-btn {
+            background: rgba(248, 113, 113, 0.2);
+            color: var(--danger);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 2;
+        }
+
+        .btn {
+            padding: 0.9rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(56, 189, 248, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* --- RIGHT PANEL --- */
+        .right-panel {
+            padding: 1.5rem;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 1.2rem;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+
+        .status-dot.active {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        /* --- DASHBOARD GRID --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 1.2rem;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            overflow: hidden;
+        }
+
+        .qr-card {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #qr-img {
+            width: 180px;
+            height: 180px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        /* --- PREVIEW MOCKUP --- */
+        .preview-container {
+            background: var(--wa-bg);
+            border-radius: 12px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+            background-size: cover;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .wa-header {
+            background: #075e54;
+            color: white;
+            padding: 10px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .wa-avatar {
+            width: 32px;
+            height: 32px;
+            background: #ddd;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 1.2rem;
+        }
+
+        .wa-body {
+            flex-grow: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            overflow-y: auto;
+        }
+
+        .wa-bubble {
+            background: var(--wa-msg);
+            color: #303030;
+            padding: 8px 12px;
+            border-radius: 8px 0 8px 8px;
+            align-self: flex-end;
+            max-width: 85%;
+            font-size: 0.9rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            position: relative;
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .wa-bubble img {
+            width: 100%;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+
+        .wa-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 4px;
+            margin-top: 2px;
+        }
+
+        .wa-time {
+            font-size: 0.65rem;
+            opacity: 0.5;
+        }
+
+        .wa-check {
+            color: #34b7f1;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .typing-indicator {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 8px;
+            align-self: flex-start;
+            font-size: 0.8rem;
+            color: #777;
+            display: none;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .typing-dots span {
+            width: 4px;
+            height: 4px;
+            background: #aaa;
+            border-radius: 50%;
+            display: inline-block;
+            animation: bounce 1s infinite;
+        }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        /* --- CONTACTS LIST --- */
+        .contacts-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem;
+        }
+
+        .contact-item {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--accent);
+        }
+
+        /* --- LOGS --- */
+        .logs-card {
+            grid-column: span 2;
+            height: 180px;
+        }
+
+        .log-container {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.8rem;
+            border-radius: 8px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s;
+        }
+
+        .shimmer {
+            background: linear-gradient(90deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        /* Hide Scrollbars */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- LEFT PANEL -->
+        <div class="left-panel">
+            <div class="logo-box">
+                <div class="logo-main">MASTODONITTECH</div>
+                <div class="logo-sub">WA Bulk Message Shooter</div>
+            </div>
+
+            <form id="campaign-form" onsubmit="event.preventDefault(); startCampaign();">
+                <div class="form-group">
+                    <div class="section-title">
+                        <span>Recipients (CSV)</span>
+                        <button type="button" onclick="clearFile('csv_file', 'csv-label')" id="clear-csv"
+                            class="clear-btn">✕</button>
+                    </div>
+                    <div class="file-input-wrapper">
+                        <span id="csv-label">Upload File</span>
+                        <input type="file" id="csv_file" accept=".csv" required onchange="handleCSVUpload(this)">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="section-title">
+                        <span>Attachment (Image)</span>
+                        <button type="button" onclick="clearFile('image', 'img-label')" id="clear-img"
+                            class="clear-btn">✕</button>
+                    </div>
+                    <div class="file-input-wrapper">
+                        <span id="img-label">Select Image</span>
+                        <input type="file" id="image" accept="image/*" onchange="handleImageUpload(this)">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea id="message" rows="5" placeholder="Type message..." required
+                        oninput="updatePreview()"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Delay (Sec)</label>
+                    <input type="number" id="delay" value="20" min="5">
+                </div>
+
+                <button type="submit" id="start-btn" class="btn btn-primary">🚀 Launch Engine</button>
+                <button type="button" id="stop-btn" onclick="stopCampaign()" class="btn btn-danger"
+                    style="display: none;">🛑 Stop Engine</button>
+            </form>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="right-panel">
+            <div class="status-header">
+                <div style="display:flex; align-items:center; gap:12px; flex: 1;">
+                    <div id="status-dot" class="status-dot"></div>
+                    <div id="user-info">
+                        <div style="font-weight:600; font-size:0.95rem;" id="user-name">Not Linked</div>
+                        <div style="font-size:0.75rem; opacity:0.6;" id="user-phone">Waiting for auth...</div>
+                    </div>
+
+                    <!-- NEW LOGOUT BUTTON POSITION -->
+                    <button id="logout-btn-nav" onclick="logoutSession()" class="btn"
+                        style="display: none; margin-left: auto; background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); color: var(--danger); font-size: 0.75rem; padding: 5px 12px;">
+                        Logout & Rescan 🔄
+                    </button>
+                </div>
+                <div id="overall-step" style="opacity:0.7; font-size:0.85rem; font-weight:600; margin-left: 20px;">
+                    STATUS: IDLE</div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- PREVIEW CARD -->
+                <div class="card">
+                    <span class="section-title">Execution Theater</span>
+                    <div class="preview-container">
+                        <div class="wa-header">
+                            <div class="wa-avatar">👤</div>
+                            <div style="display:flex; flex-direction:column;">
+                                <span id="wa-target-name" style="font-weight:600;">Recipient</span>
+                                <span id="wa-target-status" style="font-size:0.65rem; opacity:0.8;">online</span>
+                            </div>
+                        </div>
+                        <div class="wa-body">
+                            <div id="typing-box" class="typing-indicator">
+                                <div class="typing-dots">
+                                    <span></span><span></span><span></span>
+                                </div>
+                            </div>
+                            <div id="msg-bubble" class="wa-bubble">
+                                <img id="preview-img" style="display:none;" src="" />
+                                <div id="preview-text">Your message will appear here...</div>
+                                <div class="wa-footer">
+                                    <span class="wa-time" id="wa-time-now">12:00 PM</span>
+                                    <span class="wa-check" id="wa-ticks">✓✓</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PROGRESS & QR -->
+                <div class="card" style="gap:1rem; overflow:hidden;">
+                    <div id="qr-section" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <span class="section-title">WhatsApp Auth</span>
+                        <div id="qr-loading" class="shimmer" style="width: 140px; height: 140px; border-radius: 8px;">
+                        </div>
+                        <img id="qr-img" style="display:none; width: 140px; height: 140px;" />
+                    </div>
+
+                    <div id="stats-section"
+                        style="display: flex; flex-direction: column; gap: 0.8rem; overflow: hidden;">
+                        <span class="section-title">Task Progress</span>
+
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
+                            <div
+                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.1rem; font-weight:600; color:var(--primary);" id="val-total">0
+                                </div>
+                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">TOTAL</div>
+                            </div>
+                            <div
+                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.1rem; font-weight:600; color:var(--success);" id="val-success">0
+                                </div>
+                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">SENT</div>
+                            </div>
+                            <div
+                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.1rem; font-weight:600; color:var(--danger);" id="val-failed">0
+                                </div>
+                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">FAILED</div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <div
+                            style="text-align:center; font-size:0.75rem; opacity:0.6; display: flex; justify-content: space-between;">
+                            <span>Progress</span>
+                            <span id="perc-display">0%</span>
+                        </div>
+
+                        <!-- SIMPLIFIED CONTACTS DISPLAY -->
+                        <div id="contacts-display"
+                            style="display: none; align-items: center; justify-content: space-between; background: rgba(56, 189, 248, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Verified
+                                Contacts</span>
+                            <span id="count-badge"
+                                style="background: var(--primary); color: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOGS -->
+                <div class="card logs-card">
+                    <span class="section-title">Engine Logs</span>
+                    <div id="log-container" class="log-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logsIdx = 0;
+
+        function clearFile(inputId, labelId) {
+            document.getElementById(inputId).value = '';
+            document.getElementById(labelId).innerText = inputId === 'image' ? 'Select Image' : 'Upload File';
+            document.getElementById(labelId).style.color = '';
+            document.getElementById('clear-' + (inputId === 'image' ? 'img' : 'csv')).style.display = 'none';
+            if (inputId === 'image') {
+                document.getElementById('preview-img').style.display = 'none';
+            } else {
+                document.getElementById('contacts-display').style.display = 'none';
+                document.getElementById('val-total').innerText = '0';
+            }
+        }
+
+        async function handleCSVUpload(input) {
+            if (input.files.length === 0) return;
+            const label = document.getElementById('csv-label');
+            label.innerText = input.files[0].name;
+            label.style.color = 'var(--primary)';
+            document.getElementById('clear-csv').style.display = 'flex';
+
+            const formData = new FormData();
+            formData.append('csv_file', input.files[0]);
+
+            try {
+                const resp = await fetch('/parse-csv', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    document.getElementById('contacts-display').style.display = 'flex';
+                    document.getElementById('count-badge').innerText = data.count;
+                    document.getElementById('val-total').innerText = data.count;
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        function handleImageUpload(input) {
+            if (input.files.length === 0) return;
+            const label = document.getElementById('img-label');
+            label.innerText = input.files[0].name;
+            label.style.color = 'var(--primary)';
+            document.getElementById('clear-img').style.display = 'flex';
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = document.getElementById('preview-img');
+                img.src = e.target.result;
+                img.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function updatePreview() {
+            const text = document.getElementById('message').value;
+            document.getElementById('preview-text').innerText = text || "Your message will appear here...";
+        }
+
+        async function startCampaign() {
+            const formData = new FormData();
+            formData.append('csv_file', document.getElementById('csv_file').files[0]);
+            formData.append('message', document.getElementById('message').value);
+            formData.append('delay', document.getElementById('delay').value);
+            if (document.getElementById('image').files[0]) {
+                formData.append('image', document.getElementById('image').files[0]);
+            }
+
+            try {
+                const resp = await fetch('/start-bulk', { method: 'POST', body: formData });
+                const data = await resp.json();
+                console.log('Started', data);
+            } catch (err) { alert(err.message); }
+        }
+
+        async function stopCampaign() { await fetch('/stop-task'); }
+
+        async function logoutSession() {
+            if (confirm("Logout and switch account?")) {
+                const btn = event.currentTarget || event.target;
+                const originalText = btn.innerText;
+                btn.innerText = "🔌 Clearing Session...";
+                btn.disabled = true;
+
+                try {
+                    await fetch('/logout');
+                    // Wait for the bridge to fully stop and folder to be deleted
+                    setTimeout(() => {
+                        location.reload();
+                    }, 4000);
+                } catch (e) {
+                    alert("Logout failed: " + e.message);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const resp = await fetch('/status');
+                const data = await resp.json();
+
+                // Device Info
+                if (data.connected_user) {
+                    document.getElementById('status-dot').classList.add('active');
+                    document.getElementById('user-name').innerText = data.connected_user.pushname;
+                    document.getElementById('user-phone').innerText = '+' + data.connected_user.number;
+                    document.getElementById('qr-section').style.opacity = '0.2';
+                    document.getElementById('logout-btn-nav').style.display = 'block';
+                } else {
+                    document.getElementById('status-dot').classList.remove('active');
+                    document.getElementById('user-name').innerText = "Not Linked";
+                    document.getElementById('user-phone').innerText = "Waiting for auth...";
+                    document.getElementById('qr-section').style.opacity = '1';
+                    document.getElementById('logout-btn-nav').style.display = 'none';
+                }
+
+                // Execution Theater Logic
+                const targetName = document.getElementById('wa-target-name');
+                const targetStatus = document.getElementById('wa-target-status');
+                const typingBox = document.getElementById('typing-box');
+                const msgBubble = document.getElementById('msg-bubble');
+                const ticks = document.getElementById('wa-ticks');
+
+                if (data.is_running && data.current_phone) {
+                    targetName.innerText = data.current_phone;
+
+                    // Cycle animation
+                    const loopPos = new Date().getSeconds() % 10;
+                    if (loopPos < 3) {
+                        // Phase: Typing
+                        targetStatus.innerText = "typing...";
+                        typingBox.style.display = "block";
+                        msgBubble.style.display = "none";
+                    } else if (loopPos < 8) {
+                        // Phase: Sent
+                        targetStatus.innerText = "online";
+                        typingBox.style.display = "none";
+                        msgBubble.style.display = "block";
+                        ticks.style.opacity = "0.3"; // Single tick/grey
+                    } else {
+                        // Phase: Delivered
+                        targetStatus.innerText = "online";
+                        ticks.style.opacity = "1"; // Double blue
+                    }
+
+                    // Set current time
+                    document.getElementById('wa-time-now').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    // Reset to Static Preview
+                    if (!data.is_running) {
+                        targetName.innerText = "Recipient Preview";
+                        targetStatus.innerText = "online";
+                        typingBox.style.display = "none";
+                        msgBubble.style.display = "block";
+                        ticks.style.opacity = "1";
+                    }
+                }
+
+                // QR Code
+                if (data.qr_code) {
+                    const img = document.getElementById('qr-img');
+                    img.src = `data:image/png;base64,${data.qr_code}`;
+                    img.style.display = 'block';
+                    document.getElementById('qr-loading').style.display = 'none';
+                }
+
+                document.getElementById('overall-step').innerText = "STATUS: " + data.step.toUpperCase().replace(/_/g, ' ');
+
+                // Stats
+                document.getElementById('val-success').innerText = data.success;
+                document.getElementById('val-failed').innerText = data.failed;
+                if (data.total > 0) {
+                    document.getElementById('val-total').innerText = data.total;
+                    document.getElementById('contacts-display').style.display = 'flex';
+                    document.getElementById('count-badge').innerText = data.total;
+                }
+
+                const perc = data.total > 0 ? (data.current_index / data.total) * 100 : 0;
+                document.getElementById('progress-fill').style.width = perc + '%';
+                document.getElementById('perc-display').innerText = Math.round(perc) + '%';
+
+                // Logs
+                const container = document.getElementById('log-container');
+                if (data.logs.length < logsIdx) {
+                    // Reset detected
+                    logsIdx = 0;
+                    container.innerHTML = '';
+                    document.getElementById('val-success').innerText = '0';
+                    document.getElementById('val-failed').innerText = '0';
+                    document.getElementById('val-total').innerText = '0';
+                    document.getElementById('count-badge').innerText = '0';
+                    document.getElementById('contacts-display').style.display = 'none';
+                }
+
+                if (data.logs.length > logsIdx) {
+                    for (let i = logsIdx; i < data.logs.length; i++) {
+                        const div = document.createElement('div');
+                        div.style.marginBottom = '4px';
+                        div.innerHTML = `<span style="color:var(--accent)">></span> ${data.logs[i]}`;
+                        container.appendChild(div);
+                    }
+                    logsIdx = data.logs.length;
+                    container.scrollTop = container.scrollHeight;
+                }
+
+                // Buttons
+                document.getElementById('start-btn').style.display = data.is_running ? 'none' : 'block';
+                document.getElementById('stop-btn').style.display = data.is_running ? 'block' : 'none';
+
+            } catch (err) { }
+        }
+
+        setInterval(pollStatus, 2000);
+        pollStatus();
+    </script>
+</body>
+
+</html>

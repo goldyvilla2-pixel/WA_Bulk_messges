@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Node.js
+node_modules/
+bridge/node_modules/
+bridge/.wwebjs_auth/
+bridge/.wwebjs_cache/
+bridge/session.json
+.npm
+
+# App specific
+uploads/*
+!uploads/.gitkeep
+whatsapp_session/
+bridge_log.txt
+PyWhatKit_DB.txt
+.DS_Store
+*.log
