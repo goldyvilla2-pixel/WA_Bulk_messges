@@ -8,3 +8,5 @@ undetected-chromedriver
 setuptools
 pywin32; sys_platform == 'win32'
 requests
+openpyxl
+pdfplumber

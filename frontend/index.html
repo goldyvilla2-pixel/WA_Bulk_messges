@@ -221,11 +221,20 @@
         /* --- DASHBOARD GRID --- */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 2fr 1fr 1fr;
             grid-template-rows: auto 1fr;
             gap: 1.2rem;
             height: 100%;
             overflow: hidden;
+        }
+
+        .preview-card {
+            grid-row: span 2;
+        }
+
+        .logs-card {
+            grid-row: span 2;
+            height: 100% !important;
         }
 
         .card {
@@ -406,8 +415,7 @@
 
         /* --- LOGS --- */
         .logs-card {
-            grid-column: span 2;
-            height: 180px;
+            /* Handled by grid-row span in dashboard-grid */
         }
 
         .log-container {
@@ -459,10 +467,74 @@
             background: rgba(56, 189, 248, 0.3);
             border-radius: 10px;
         }
+
+        /* --- FLASHY FAILURE ALERT --- */
+        #fail-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(127, 29, 29, 0.95);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            animation: pulseBg 1s infinite alternate;
+        }
+
+        @keyframes pulseBg {
+            from { background: rgba(127, 29, 29, 0.9); }
+            to { background: rgba(185, 28, 28, 0.98); }
+        }
+
+        .alert-box {
+            background: #000;
+            padding: 3rem;
+            border-radius: 20px;
+            border: 4px solid #f87171;
+            max-width: 600px;
+            box-shadow: 0 0 100px rgba(248, 113, 113, 0.5);
+        }
+
+        .alert-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            color: #f87171;
+            text-transform: uppercase;
+        }
+
+        .alert-detail {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        .alert-detail span {
+            color: #fbbf24;
+            font-weight: 600;
+        }
     </style>
 </head>
 
 <body>
+
+    <div id="fail-overlay">
+        <div class="alert-box">
+            <div class="alert-title">❌ STOPPED!</div>
+            <div class="alert-detail">
+                Message Sending Failed at:<br><br>
+                ROW: <span id="fail-row">0</span><br>
+                PHONE: <span id="fail-phone">N/A</span><br><br>
+                REASON: <span id="fail-reason" style="color:white; font-size:1.1rem; opacity:0.8;">Unknown Error</span>
+            </div>
+            <button onclick="dismissAlert()" class="btn btn-primary" style="width:100%; font-size:1.2rem; padding:1.2rem;">OK, I UNDERSTAND</button>
+        </div>
+    </div>
 
     <div class="container">
         <!-- LEFT PANEL -->
@@ -475,14 +547,19 @@
             <form id="campaign-form" onsubmit="event.preventDefault(); startCampaign();">
                 <div class="form-group">
                     <div class="section-title">
-                        <span>Recipients (CSV)</span>
-                        <button type="button" onclick="clearFile('csv_file', 'csv-label')" id="clear-csv"
+                        <span>Recipients (CSV/Excel/PDF)</span>
+                        <button type="button" onclick="clearFile('file_source', 'file-label')" id="clear-file"
                             class="clear-btn">✕</button>
                     </div>
                     <div class="file-input-wrapper">
-                        <span id="csv-label">Upload File</span>
-                        <input type="file" id="csv_file" accept=".csv" required onchange="handleCSVUpload(this)">
+                        <span id="file-label">Upload File</span>
+                        <input type="file" id="file_source" accept=".csv,.xlsx,.xls,.pdf" onchange="handleSourceUpload(this)">
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Google Sheet URL</label>
+                    <input type="text" id="gsheet_url" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="handleGSheetInput(this)">
                 </div>
 
                 <div class="form-group">
@@ -506,6 +583,17 @@
                 <div class="form-group">
                     <label>Delay (Sec)</label>
                     <input type="number" id="delay" value="20" min="5">
+                </div>
+
+                <div class="form-group" style="padding: 1rem; background: rgba(56, 189, 248, 0.05); border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.1);">
+                    <div class="section-title">
+                        <span>Interactive Button (CTA)</span>
+                    </div>
+                    <label>Button Label</label>
+                    <input type="text" id="btn_text" placeholder="e.g. Chat with Us" oninput="updatePreview()">
+                    <label style="margin-top: 0.5rem;">Button URL / Link</label>
+                    <input type="text" id="btn_url" placeholder="https://..." oninput="updatePreview()">
+                    <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 0.5rem;">* Buttons in standard WA are sent as Link-Previews for maximum safety.</p>
                 </div>
 
                 <button type="submit" id="start-btn" class="btn btn-primary">🚀 Launch Engine</button>
@@ -536,7 +624,7 @@
 
             <div class="dashboard-grid">
                 <!-- PREVIEW CARD -->
-                <div class="card">
+                <div class="card preview-card">
                     <span class="section-title">Execution Theater</span>
                     <div class="preview-container">
                         <div class="wa-header">
@@ -555,6 +643,15 @@
                             <div id="msg-bubble" class="wa-bubble">
                                 <img id="preview-img" style="display:none;" src="" />
                                 <div id="preview-text">Your message will appear here...</div>
+                                
+                                <div id="preview-cta" style="display:none; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); flex-direction: column; align-items: stretch;">
+                                    <div id="cta-button-mock" style="background: #fff; color: #008069; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600; font-size: 0.8rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #008069; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                        <span id="cta-text-val">Visit Website</span>
+                                        <span style="font-size: 10px;">↗</span>
+                                    </div>
+                                    <div id="cta-link-val" style="font-size: 0.7rem; color: #0645ad; margin-top: 4px; text-align: center; opacity: 0.7;">https://example.com</div>
+                                </div>
+
                                 <div class="wa-footer">
                                     <span class="wa-time" id="wa-time-now">12:00 PM</span>
                                     <span class="wa-check" id="wa-ticks">✓✓</span>
@@ -564,61 +661,54 @@
                     </div>
                 </div>
 
-                <!-- PROGRESS & QR -->
-                <div class="card" style="gap:1rem; overflow:hidden;">
-                    <div id="qr-section" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                        <span class="section-title">WhatsApp Auth</span>
-                        <div id="qr-loading" class="shimmer" style="width: 140px; height: 140px; border-radius: 8px;">
+                <!-- QR AUTH CARD -->
+                <div class="card qr-card" style="justify-content: flex-start; align-items: center;">
+                    <span class="section-title">WhatsApp Auth</span>
+                    <div id="qr-section" style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 10px;">
+                        <div id="qr-loading" class="shimmer" style="width: 160px; height: 160px; border-radius: 8px;">
                         </div>
-                        <img id="qr-img" style="display:none; width: 140px; height: 140px;" />
+                        <img id="qr-img" style="display:none; width: 160px; height: 160px;" />
+                        <p style="font-size: 0.75rem; opacity: 0.6; text-align: center;">Scan to Link Engine</p>
                     </div>
+                </div>
 
-                    <div id="stats-section"
-                        style="display: flex; flex-direction: column; gap: 0.8rem; overflow: hidden;">
-                        <span class="section-title">Task Progress</span>
-
+                <!-- PROGRESS CARD -->
+                <div class="card stats-card" style="justify-content: space-between;">
+                    <span class="section-title">Task Progress</span>
+                    <div id="stats-section" style="display: flex; flex-direction: column; gap: 1rem;">
                         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
-                            <div
-                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:1.1rem; font-weight:600; color:var(--primary);" id="val-total">0
-                                </div>
-                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">TOTAL</div>
+                            <div style="text-align:center; background: rgba(0,0,0,0.2); padding: 12px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.3rem; font-weight:600; color:var(--primary);" id="val-total">0</div>
+                                <div style="font-size:0.6rem; opacity:0.6; letter-spacing: 0.5px;">TOTAL</div>
                             </div>
-                            <div
-                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:1.1rem; font-weight:600; color:var(--success);" id="val-success">0
-                                </div>
-                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">SENT</div>
+                            <div style="text-align:center; background: rgba(0,0,0,0.2); padding: 12px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.3rem; font-weight:600; color:var(--success);" id="val-success">0</div>
+                                <div style="font-size:0.6rem; opacity:0.6; letter-spacing: 0.5px;">SENT</div>
                             </div>
-                            <div
-                                style="text-align:center; background: rgba(0,0,0,0.2); padding: 10px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                                <div style="font-size:1.1rem; font-weight:600; color:var(--danger);" id="val-failed">0
-                                </div>
-                                <div style="font-size:0.55rem; opacity:0.6; letter-spacing: 0.5px;">FAILED</div>
+                            <div style="text-align:center; background: rgba(0,0,0,0.2); padding: 12px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div style="font-size:1.3rem; font-weight:600; color:var(--danger);" id="val-failed">0</div>
+                                <div style="font-size:0.6rem; opacity:0.6; letter-spacing: 0.5px;">FAILED</div>
                             </div>
                         </div>
 
-                        <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
-                        </div>
-                        <div
-                            style="text-align:center; font-size:0.75rem; opacity:0.6; display: flex; justify-content: space-between;">
-                            <span>Progress</span>
-                            <span id="perc-display">0%</span>
+                        <div style="margin-top: 5px;">
+                            <div class="progress-bar" style="height: 10px;">
+                                <div id="progress-fill" class="progress-fill"></div>
+                            </div>
+                            <div style="text-align:center; font-size:0.75rem; opacity:0.6; display: flex; justify-content: space-between; margin-top: 8px;">
+                                <span>Progress</span>
+                                <span id="perc-display">0%</span>
+                            </div>
                         </div>
 
-                        <!-- SIMPLIFIED CONTACTS DISPLAY -->
-                        <div id="contacts-display"
-                            style="display: none; align-items: center; justify-content: space-between; background: rgba(56, 189, 248, 0.1); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.2);">
-                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">Verified
-                                Contacts</span>
-                            <span id="count-badge"
-                                style="background: var(--primary); color: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">0</span>
+                        <div id="contacts-display" style="display: none; align-items: center; justify-content: space-between; background: rgba(56, 189, 248, 0.1); padding: 10px 15px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--primary);">Verified Contacts</span>
+                            <span id="count-badge" style="background: var(--primary); color: var(--bg); padding: 2px 10px; border-radius: 4px; font-size: 0.9rem; font-weight: 600;">0</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- LOGS -->
+                <!-- LOGS CARD -->
                 <div class="card logs-card">
                     <span class="section-title">Engine Logs</span>
                     <div id="log-container" class="log-container"></div>
@@ -629,34 +719,80 @@
 
     <script>
         let logsIdx = 0;
+        let isAlerting = false;
+        const alarmSound = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
+        alarmSound.loop = true;
+
+        function dismissAlert() {
+            document.getElementById('fail-overlay').style.display = 'none';
+            alarmSound.pause();
+            alarmSound.currentTime = 0;
+            isAlerting = false;
+        }
+
+        function triggerFailureAlert(row, phone, reason) {
+            if (isAlerting) return;
+            isAlerting = true;
+            document.getElementById('fail-row').innerText = row;
+            document.getElementById('fail-phone').innerText = phone;
+            document.getElementById('fail-reason').innerText = reason;
+            document.getElementById('fail-overlay').style.display = 'flex';
+            
+            // Interaction might be needed for sound, but we try
+            alarmSound.play().catch(e => console.log("Sound blocked by browser until interaction"));
+        }
 
         function clearFile(inputId, labelId) {
             document.getElementById(inputId).value = '';
             document.getElementById(labelId).innerText = inputId === 'image' ? 'Select Image' : 'Upload File';
             document.getElementById(labelId).style.color = '';
-            document.getElementById('clear-' + (inputId === 'image' ? 'img' : 'csv')).style.display = 'none';
+            document.getElementById('clear-' + (inputId === 'image' ? 'img' : 'file')).style.display = 'none';
             if (inputId === 'image') {
                 document.getElementById('preview-img').style.display = 'none';
             } else {
                 document.getElementById('contacts-display').style.display = 'none';
                 document.getElementById('val-total').innerText = '0';
+                document.getElementById('gsheet_url').value = '';
             }
         }
 
-        async function handleCSVUpload(input) {
+        async function handleSourceUpload(input) {
             if (input.files.length === 0) return;
-            const label = document.getElementById('csv-label');
+            const label = document.getElementById('file-label');
             label.innerText = input.files[0].name;
             label.style.color = 'var(--primary)';
-            document.getElementById('clear-csv').style.display = 'flex';
+            document.getElementById('clear-file').style.display = 'flex';
+            document.getElementById('gsheet_url').value = ''; 
 
             const formData = new FormData();
-            formData.append('csv_file', input.files[0]);
+            formData.append('file_source', input.files[0]);
 
             try {
-                const resp = await fetch('/parse-csv', { method: 'POST', body: formData });
+                const resp = await fetch('/parse-source', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (data.status === 'success') {
+                    document.getElementById('contacts-display').style.display = 'flex';
+                    document.getElementById('count-badge').innerText = data.count;
+                    document.getElementById('val-total').innerText = data.count;
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function handleGSheetInput(input) {
+            const val = input.value.trim();
+            if (!val.startsWith('http')) return;
+            
+            document.getElementById('file-label').innerText = 'Upload File';
+            document.getElementById('file_source').value = '';
+            document.getElementById('clear-file').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('gsheet_url', val);
+
+            try {
+                const resp = await fetch('/parse-source', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.status === 'success' && data.count > 0) {
                     document.getElementById('contacts-display').style.display = 'flex';
                     document.getElementById('count-badge').innerText = data.count;
                     document.getElementById('val-total').innerText = data.count;
@@ -682,14 +818,32 @@
 
         function updatePreview() {
             const text = document.getElementById('message').value;
+            const btnText = document.getElementById('btn_text').value;
+            const btnUrl = document.getElementById('btn_url').value;
+
             document.getElementById('preview-text').innerText = text || "Your message will appear here...";
+            
+            const ctaBox = document.getElementById('preview-cta');
+            if (btnText || btnUrl) {
+                ctaBox.style.display = "flex";
+                document.getElementById('cta-text-val').innerText = btnText || "Click Here";
+                document.getElementById('cta-link-val').innerText = btnUrl || "https://...";
+            } else {
+                ctaBox.style.display = "none";
+            }
         }
 
         async function startCampaign() {
             const formData = new FormData();
-            formData.append('csv_file', document.getElementById('csv_file').files[0]);
+            const fileInput = document.getElementById('file_source');
+            if (fileInput.files[0]) {
+                formData.append('file_source', fileInput.files[0]);
+            }
+            formData.append('gsheet_url', document.getElementById('gsheet_url').value);
             formData.append('message', document.getElementById('message').value);
             formData.append('delay', document.getElementById('delay').value);
+            formData.append('btn_text', document.getElementById('btn_text').value);
+            formData.append('btn_url', document.getElementById('btn_url').value);
             if (document.getElementById('image').files[0]) {
                 formData.append('image', document.getElementById('image').files[0]);
             }
@@ -836,6 +990,15 @@
                 // Buttons
                 document.getElementById('start-btn').style.display = data.is_running ? 'none' : 'block';
                 document.getElementById('stop-btn').style.display = data.is_running ? 'block' : 'none';
+
+                // Failure Alert
+                if (data.step === "stopped_on_error" && data.last_failed_info) {
+                    triggerFailureAlert(
+                        data.last_failed_info.row,
+                        data.last_failed_info.phone,
+                        data.last_failed_info.error
+                    );
+                }
 
             } catch (err) { }
         }
