@@ -426,11 +426,8 @@
         }
 
         /* --- LOGS --- */
-        .logs-card {
-            /* Handled by grid-row span in dashboard-grid */
-        }
-
         .log-container {
+            flex: 1;
             font-family: 'Courier New', monospace;
             font-size: 0.8rem;
             background: rgba(0, 0, 0, 0.2);
@@ -559,19 +556,27 @@
             <form id="campaign-form" onsubmit="event.preventDefault(); startCampaign();">
                 <div class="form-group">
                     <div class="section-title">
-                        <span>Recipients (CSV/Excel/PDF)</span>
-                        <button type="button" onclick="clearFile('file_source', 'file-label')" id="clear-file"
-                            class="clear-btn">✕</button>
+                        <span>Recipient Source</span>
                     </div>
-                    <div class="file-input-wrapper">
-                        <span id="file-label">Upload File</span>
-                        <input type="file" id="file_source" accept=".csv,.xlsx,.xls,.pdf" onchange="handleSourceUpload(this)">
+                    
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px;">
+                        <button type="button" onclick="switchSource('file')" id="source-btn-file" class="btn" style="flex:1; font-size: 0.75rem; padding: 8px; background: var(--primary); color: var(--bg);">CSV / Excel</button>
+                        <button type="button" onclick="switchSource('gsheet')" id="source-btn-gsheet" class="btn" style="flex:1; font-size: 0.75rem; padding: 8px; background: transparent; color: white;">Google Sheet</button>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label>Google Sheet URL</label>
-                    <input type="text" id="gsheet_url" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="handleGSheetInput(this)">
+                    <!-- FILE INPUT -->
+                    <div id="file-input-group">
+                        <div class="file-input-wrapper" style="border-style: solid; border-width: 1px;">
+                            <span id="file-label">Select CSV or Excel</span>
+                            <input type="file" id="file_source" accept=".csv,.xlsx,.xls" onchange="handleSourceUpload(this)">
+                        </div>
+                    </div>
+
+                    <!-- GSHEET INPUT -->
+                    <div id="gsheet-input-group" style="display: none;">
+                        <input type="text" id="gsheet_url" placeholder="Paste Google Sheet Link..." oninput="handleGSheetInput(this)" style="width: 100%;">
+                        <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 5px;">* Make sure to set "Anyone with the link can view"</p>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -756,16 +761,40 @@
 
         function clearFile(inputId, labelId) {
             document.getElementById(inputId).value = '';
-            document.getElementById(labelId).innerText = inputId === 'image' ? 'Select Image' : 'Upload File';
+            document.getElementById(labelId).innerText = inputId === 'image' ? 'Select Image' : 'Select CSV or Excel';
             document.getElementById(labelId).style.color = '';
             document.getElementById('clear-' + (inputId === 'image' ? 'img' : 'file')).style.display = 'none';
             if (inputId === 'image') {
                 document.getElementById('preview-img').style.display = 'none';
-            } else {
-                document.getElementById('contacts-display').style.display = 'none';
-                document.getElementById('val-total').innerText = '0';
-                document.getElementById('gsheet_url').value = '';
             }
+        }
+
+        function switchSource(type) {
+            const fileBtn = document.getElementById('source-btn-file');
+            const sheetBtn = document.getElementById('source-btn-gsheet');
+            const fileGroup = document.getElementById('file-input-group');
+            const sheetGroup = document.getElementById('gsheet-input-group');
+
+            if (type === 'file') {
+                fileBtn.style.background = 'var(--primary)';
+                fileBtn.style.color = 'var(--bg)';
+                sheetBtn.style.background = 'transparent';
+                sheetBtn.style.color = 'white';
+                fileGroup.style.display = 'block';
+                sheetGroup.style.display = 'none';
+                document.getElementById('gsheet_url').value = '';
+            } else {
+                sheetBtn.style.background = 'var(--primary)';
+                sheetBtn.style.color = 'var(--bg)';
+                fileBtn.style.background = 'transparent';
+                fileBtn.style.color = 'white';
+                fileGroup.style.display = 'none';
+                sheetGroup.style.display = 'block';
+                document.getElementById('file_source').value = '';
+                document.getElementById('file-label').innerText = 'Select CSV or Excel';
+            }
+            document.getElementById('contacts-display').style.display = 'none';
+            document.getElementById('val-total').innerText = '0';
         }
 
         async function handleSourceUpload(input) {
@@ -773,19 +802,21 @@
             const label = document.getElementById('file-label');
             label.innerText = input.files[0].name;
             label.style.color = 'var(--primary)';
-            document.getElementById('clear-file').style.display = 'flex';
-            document.getElementById('gsheet_url').value = ''; 
-
+            
             const formData = new FormData();
             formData.append('file_source', input.files[0]);
 
             try {
                 const resp = await fetch('/parse-source', { method: 'POST', body: formData });
                 const data = await resp.json();
-                if (data.status === 'success') {
+                if (data.status === 'success' && data.count > 0) {
                     document.getElementById('contacts-display').style.display = 'flex';
                     document.getElementById('count-badge').innerText = data.count;
                     document.getElementById('val-total').innerText = data.count;
+                } else {
+                    alert("No valid contacts found in this file.");
+                    label.innerText = "Select CSV or Excel";
+                    label.style.color = "";
                 }
             } catch (err) { console.error(err); }
         }
@@ -794,10 +825,6 @@
             const val = input.value.trim();
             if (!val.startsWith('http')) return;
             
-            document.getElementById('file-label').innerText = 'Upload File';
-            document.getElementById('file_source').value = '';
-            document.getElementById('clear-file').style.display = 'none';
-
             const formData = new FormData();
             formData.append('gsheet_url', val);
 
@@ -808,6 +835,9 @@
                     document.getElementById('contacts-display').style.display = 'flex';
                     document.getElementById('count-badge').innerText = data.count;
                     document.getElementById('val-total').innerText = data.count;
+                    input.style.borderColor = "var(--success)";
+                } else {
+                    input.style.borderColor = "var(--danger)";
                 }
             } catch (err) { console.error(err); }
         }
