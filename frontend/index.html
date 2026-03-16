@@ -564,6 +564,12 @@
                         <button type="button" onclick="switchSource('gsheet')" id="source-btn-gsheet" class="btn" style="flex:1; font-size: 0.75rem; padding: 8px; background: transparent; color: white;">Google Sheet</button>
                     </div>
 
+                    <div style="margin-bottom: 10px;">
+                        <a href="/download-template" class="btn" style="font-size: 0.65rem; padding: 4px 10px; background: rgba(255,255,255,0.05); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                            📥 Download Sample Template
+                        </a>
+                    </div>
+
                     <!-- FILE INPUT -->
                     <div id="file-input-group">
                         <div class="file-input-wrapper" style="border-style: solid; border-width: 1px;">
@@ -591,9 +597,26 @@
                     </div>
                 </div>
 
+                <div class="form-group" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin:0;">Spintax Mode</label>
+                        <label class="switch">
+                            <input type="checkbox" id="use_spintax">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin:0;">Safe-Start 🔥</label>
+                        <label class="switch">
+                            <input type="checkbox" id="use_safe_start" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Message</label>
-                    <textarea id="message" rows="5" placeholder="Type message..." required
+                    <textarea id="message" rows="5" placeholder="Type message... Use {{Name}} for personalization or {Hi|Hello} for Spintax." required
                         oninput="updatePreview()"></textarea>
                 </div>
 
@@ -722,6 +745,12 @@
                             <span style="font-size: 0.85rem; font-weight: 600; color: var(--primary);">Verified Contacts</span>
                             <span id="count-badge" style="background: var(--primary); color: var(--bg); padding: 2px 10px; border-radius: 4px; font-size: 0.9rem; font-weight: 600;">0</span>
                         </div>
+
+                        <div id="report-section" style="display: none; margin-top: 10px;">
+                            <a href="/download-report" class="btn btn-primary" style="width: 100%; font-size: 0.8rem; background: var(--success); color: white; text-decoration: none; text-align: center;">
+                                📊 Download Campaign Report
+                            </a>
+                        </div>
                     </div>
                 </div>
 
@@ -734,9 +763,20 @@
         </div>
     </div>
 
+    <style>
+        /* SWITCH TOGGLE */
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+    </style>
+
     <script>
         let logsIdx = 0;
         let isAlerting = false;
+        let currentItems = []; // Store parsed items locally for start
         const alarmSound = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
         alarmSound.loop = true;
 
@@ -877,15 +917,24 @@
 
         async function startCampaign() {
             const formData = new FormData();
-            const fileInput = document.getElementById('file_source');
-            if (fileInput.files[0]) {
-                formData.append('file_source', fileInput.files[0]);
+            
+            // If items were parsed locally
+            if (currentItems.length > 0) {
+                formData.append('items_json', JSON.stringify(currentItems));
+            } else {
+                // Fallback to source
+                const fileInput = document.getElementById('file_source');
+                if (fileInput.files[0]) formData.append('file_source', fileInput.files[0]);
+                formData.append('gsheet_url', document.getElementById('gsheet_url').value);
             }
-            formData.append('gsheet_url', document.getElementById('gsheet_url').value);
+
             formData.append('message', document.getElementById('message').value);
             formData.append('delay', document.getElementById('delay').value);
             formData.append('btn_text', document.getElementById('btn_text').value);
             formData.append('btn_url', document.getElementById('btn_url').value);
+            formData.append('use_spintax', document.getElementById('use_spintax').checked);
+            formData.append('use_safe_start', document.getElementById('use_safe_start').checked);
+
             if (document.getElementById('image').files[0]) {
                 formData.append('image', document.getElementById('image').files[0]);
             }
@@ -893,7 +942,7 @@
             try {
                 const resp = await fetch('/start-bulk', { method: 'POST', body: formData });
                 const data = await resp.json();
-                console.log('Started', data);
+                document.getElementById('report-section').style.display = 'none';
             } catch (err) { alert(err.message); }
         }
 
@@ -1032,6 +1081,10 @@
                 // Buttons
                 document.getElementById('start-btn').style.display = data.is_running ? 'none' : 'block';
                 document.getElementById('stop-btn').style.display = data.is_running ? 'block' : 'none';
+
+                if (!data.is_running && (data.step === 'finished' || data.step === 'stopped_on_error')) {
+                    document.getElementById('report-section').style.display = 'block';
+                }
 
                 // Failure Alert
                 if (data.step === "stopped_on_error" && data.last_failed_info) {

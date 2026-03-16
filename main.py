@@ -42,14 +42,17 @@ def ensure_dirs():
 # Global status tracking
 sending_status = {
     "is_running": False,
-    "current_index": 0,
     "total": 0,
     "success": 0,
     "failed": 0,
+    "current_index": 0,
+    "current_phone": "",
     "logs": [],
-    "step": "idle", # idle, waiting_for_qr, sending, finished
+    "connected_user": None,
     "qr_code": None,
-    "connected_user": None
+    "step": "idle",
+    "last_failed_info": None,
+    "campaign_report": [] # Store results for CSV download
 }
 
 bridge_process = None
@@ -107,14 +110,34 @@ async def get_status():
         
     return sending_status
 
-def bulk_send_task(numbers: List[str], message: str, image_path: str, delay: int, btn_text: str = "", btn_url: str = ""):
+def parse_spintax(text: str) -> str:
+    """Randomly picks one variation from {Hi|Hello|Hey}"""
+    while True:
+        match = re.search(r'\{([^{}]*)\}', text)
+        if not match:
+            break
+        choices = match.group(1).split('|')
+        text = text.replace(match.group(0), random.choice(choices), 1)
+    return text
+
+def apply_variables(text: str, vars_dict: dict) -> str:
+    """Replaces {{Name}} with the value from vars_dict"""
+    for key, val in vars_dict.items():
+        placeholder = "{{" + str(key) + "}}"
+        text = text.replace(placeholder, str(val))
+    return text
+
+def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int, 
+                   btn_text: str = "", btn_url: str = "", 
+                   use_spintax: bool = False, use_safe_start: bool = False):
     global sending_status
     sending_status["is_running"] = True
-    sending_status["total"] = len(numbers)
+    sending_status["total"] = len(items)
     sending_status["success"] = 0
     sending_status["failed"] = 0
     sending_status["current_index"] = 0
-    sending_status["last_failed_info"] = None # Reset on start
+    sending_status["last_failed_info"] = None 
+    sending_status["campaign_report"] = [] 
     sending_status["logs"] = ["⚡ Initializing Thunder-Link Bridge..."]
     sending_status["step"] = "initializing"
     
@@ -140,124 +163,147 @@ def bulk_send_task(numbers: List[str], message: str, image_path: str, delay: int
         sending_status["is_running"] = False
         return
 
-    for i, phone in enumerate(numbers):
+    for i, item in enumerate(items):
         if not sending_status["is_running"]: break
+        
+        phone = item["phone"]
+        vars = item.get("vars", {})
+        
         sending_status["current_index"] = i + 1
         sending_status["current_phone"] = phone
         clean_phone = phone.replace("+", "").replace(" ", "").replace("-", "")
         
+        # 1. Spintax
+        final_msg = message
+        if use_spintax:
+            final_msg = parse_spintax(final_msg)
+            
+        # 2. Personalization
+        final_msg = apply_variables(final_msg, vars)
+        
+        # 3. Dynamic Button URLs (can also have vars)
+        final_btn_url = apply_variables(btn_url, vars)
+        
         try:
-            sending_status["logs"].append(f"📤 Sending to {phone}...")
+            sending_status["logs"].append(f"📤 [{i+1}/{len(items)}] Sending to {phone}...")
             
-            # Anti-spam measure: Append random invisible (zero-width) characters
-            invisible_chars = ['\u200B', '\u200C', '\u200D', '\uFEFF', '\u200E', '\u200F']
-            unique_padding = "".join(random.choices(invisible_chars, k=random.randint(5, 12)))
-            unique_message = message
-            
-            # Append CTA if present
-            if btn_text or btn_url:
-                cta_part = f"\n\n🔗 *{btn_text or 'Click Here'}*\n{btn_url}"
-                unique_message += cta_part
-
-            unique_message += "\n" + unique_padding
+            # Simulated Typing
+            requests.get(f"http://localhost:3001/typing?phone={clean_phone}&duration=2", timeout=5)
             
             payload = {
                 "phone": clean_phone,
-                "message": unique_message,
-                "imagePath": image_path if image_path else None
+                "message": final_msg,
+                "image": image_path
             }
-            resp = requests.post("http://localhost:3001/send", json=payload, timeout=60)
-            if resp.status_code == 200:
+            if btn_text and final_btn_url:
+                payload["cta_text"] = btn_text
+                payload["cta_url"] = final_btn_url
+
+            resp = requests.post("http://localhost:3001/send", json=payload, timeout=30).json()
+            
+            if resp.get("status") == "success":
                 sending_status["success"] += 1
-                sending_status["logs"].append(f"✅ Sent to {phone}")
+                sending_status["logs"].append(f"✅ Sent successfully to {phone}")
+                sending_status["campaign_report"].append({
+                    "phone": phone, "status": "Success", "error": "", "row": i+1, **vars
+                })
             else:
-                raise Exception(resp.json().get("error", "Unknown error"))
+                raise Exception(resp.get("error", "Unknown error"))
+                
         except Exception as e:
+            err_msg = str(e)
             sending_status["failed"] += 1
-            error_msg = str(e)
-            fail_info = f"FAILED: Row {i+1} | {phone} | {error_msg}"
-            sending_status["last_failed_info"] = {
-                "row": i + 1,
-                "phone": phone,
-                "error": error_msg
-            }
-            sending_status["logs"].append(f"❌ {fail_info}")
-            sending_status["is_running"] = False # STOP IMMEDIATELY
+            sending_status["logs"].append(f"❌ Failed for {phone}: {err_msg}")
+            sending_status["last_failed_info"] = {"row": i+1, "phone": phone, "error": err_msg}
+            sending_status["campaign_report"].append({
+                "phone": phone, "status": "Failed", "error": err_msg, "row": i+1, **vars
+            })
             sending_status["step"] = "stopped_on_error"
+            sending_status["logs"].append("🚨 Engine STOPPED due to failure.")
+            sending_status["is_running"] = False
             break
 
-        
-        if i < len(numbers) - 1:
-            # Smart Pause: every 10 messages, take a longer break
+        if i < len(items) - 1:
+            # 4. Safe Start (Warmup Mode)
+            # Starts with 3x delay and slowly reduces to 1x over first 10 messages
+            current_delay = delay
+            if use_safe_start and i < 10:
+                multiplier = 3.0 - (i * 0.2) # 3.0, 2.8, 2.6 ... 1.2, 1.0
+                current_delay = int(delay * max(1.0, multiplier))
+                sending_status["logs"].append(f"🌬️ Safe-Start in effect: Delay is {current_delay}s")
+
+            # Smart Pause
             if (i + 1) % 10 == 0:
-                smart_wait = random.randint(60, 180) # 1 to 3 minutes
-                sending_status["logs"].append(f"🛌 Taking a Smart Pause for {smart_wait}s to stay stealthy...")
+                smart_wait = random.randint(60, 180) 
+                sending_status["logs"].append(f"🛌 Smart Pause for {smart_wait}s...")
                 time.sleep(smart_wait)
             else:
-                # Normal variation
-                wait = delay + random.randint(-5, 10) # More variation: -5s to +10s
-                time.sleep(max(5, wait))
+                wait = current_delay + random.randint(-2, 5) 
+                time.sleep(max(3, wait))
 
-    sending_status["step"] = "finished"
-    sending_status["logs"].append("🏁 Bulk send completed!")
+    if sending_status["step"] != "stopped_on_error":
+        sending_status["step"] = "finished"
+        sending_status["logs"].append("🏁 Bulk send completed!")
+    
     sending_status["is_running"] = False
 
-    sending_status["is_running"] = False
-
-def extract_phone_numbers(df: pd.DataFrame) -> List[str]:
-    """Helper to find phone numbers in a dataframe"""
-    phone_list = []
+def extract_phone_numbers(df: pd.DataFrame) -> List[dict]:
+    """Helper to return phone + all other columns as variables"""
+    results = []
     cols_map = {c.lower(): c for c in df.columns}
     
-    # Check for CC + Phone columns
-    has_cc = 'country_code' in cols_map or 'cc' in cols_map
-    has_phone = 'phone' in cols_map or 'number' in cols_map
+    cc_col = cols_map.get('country_code') or cols_map.get('cc')
+    ph_col = cols_map.get('phone') or cols_map.get('number')
     
-    if has_cc and has_phone:
-        cc_col = cols_map.get('country_code') or cols_map.get('cc')
-        ph_col = cols_map.get('phone') or cols_map.get('number')
-        for _, row in df.iterrows():
+    for idx, row in df.iterrows():
+        phone = ""
+        # 1. Detection
+        if cc_col and ph_col:
             cc = str(row[cc_col]).strip().split('.')[0] if pd.notna(row[cc_col]) else ""
             ph = str(row[ph_col]).strip().split('.')[0] if pd.notna(row[ph_col]) else ""
-            if not ph or ph.lower() == 'nan': continue
             cc = cc.replace('+', '')
             ph = ph.replace('+', '')
-            phone_list.append(f"+{cc}{ph}")
-    else:
-        # Scan all columns for things that look like numbers
-        for col in df.columns:
-            for val in df[col].astype(str):
+            phone = f"+{cc}{ph}"
+        else:
+            # Use first column that looks like a number
+            for col in df.columns:
+                val = str(row[col])
                 clean = re.sub(r'[^0-9+]', '', val)
-                if len(clean) >= 10: # Basic length check
-                    if not clean.startswith('+'): clean = '+' + clean
-                    phone_list.append(clean)
-    return phone_list
+                if len(clean) >= 10:
+                    phone = clean if clean.startswith('+') else '+' + clean
+                    break
+        
+        if phone:
+            # Map all row data into variables
+            vars = {str(k): str(v) for k, v in row.items() if pd.notna(v)}
+            results.append({"phone": phone, "vars": vars})
+            
+    return results
 
 @app.post("/start-bulk")
 async def start_bulk(
     background_tasks: BackgroundTasks,
-    numbers_list: str = Form(None), # Direct JSON list or string
+    items_json: str = Form(None), 
     gsheet_url: str = Form(""),
     message: str = Form(...),
     delay: int = Form(20),
     btn_text: str = Form(""),
     btn_url: str = Form(""),
+    use_spintax: bool = Form(False),
+    use_safe_start: bool = Form(False),
     image: UploadFile = File(None),
     file_source: UploadFile = File(None)
 ):
-    final_list = []
+    final_items = []
 
-    # 1. Handle Direct List (if provided by UI after parsing)
-    if numbers_list:
+    if items_json:
         try:
             import json
-            final_list = json.loads(numbers_list)
+            final_items = json.loads(items_json)
         except: pass
 
-    # 2. Handle GSheet
-    if gsheet_url and not final_list:
+    if gsheet_url and not final_items:
         try:
-            # Convert /edit to /export?format=csv
             if "/edit" in gsheet_url:
                 export_url = gsheet_url.split("/edit")[0] + "/export?format=csv"
                 if "gid=" in gsheet_url:
@@ -266,40 +312,20 @@ async def start_bulk(
                 resp = requests.get(export_url, timeout=10)
                 if resp.status_code == 200:
                     df = pd.read_csv(io.BytesIO(resp.content), dtype=str)
-                    final_list.extend(extract_phone_numbers(df))
-        except Exception as e:
-            logger.error(f"GSheet error: {e}")
+                    final_items.extend(extract_phone_numbers(df))
+        except: pass
 
-    # 3. Handle Uploaded File
-    if file_source and not final_list:
+    if file_source and not final_items:
         filename = file_source.filename.lower()
         contents = await file_source.read()
         
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contents), dtype=str)
-            final_list.extend(extract_phone_numbers(df))
+            final_items.extend(extract_phone_numbers(df))
         elif filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(contents), dtype=str)
-            final_list.extend(extract_phone_numbers(df))
-        elif filename.endswith(".pdf"):
-            with pdfplumber.open(io.BytesIO(contents)) as pdf:
-                full_text = ""
-                for page in pdf.pages:
-                    full_text += page.extract_text() or ""
-                # Regex for phone numbers (basic international)
-                found = re.findall(r'\+?\d{10,15}', full_text)
-                final_list.extend(found)
+            final_items.extend(extract_phone_numbers(df))
 
-    # Sanitize and unique
-    cleaned = []
-    seen = set()
-    for p in final_list:
-        p = p.replace(" ", "").replace("-", "")
-        if not p.startswith('+'): p = '+' + p
-        if p not in seen and len(p) > 10:
-            seen.add(p)
-            cleaned.append(p)
-    
     image_path = ""
     if image and image.filename:
         filename = f"{uuid.uuid4()}_{image.filename}"
@@ -307,16 +333,15 @@ async def start_bulk(
         with open(image_path, "wb") as f:
             f.write(await image.read())
 
-    background_tasks.add_task(bulk_send_task, cleaned, message, image_path, delay, btn_text, btn_url)
-    return {"status": "started", "total": len(cleaned)}
+    background_tasks.add_task(bulk_send_task, final_items, message, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start)
+    return {"status": "started", "total": len(final_items)}
 
 @app.post("/parse-source")
 async def parse_source(
     file_source: UploadFile = File(None),
     gsheet_url: str = Form("")
 ):
-    phone_list = []
-    
+    items = []
     if gsheet_url:
         try:
             if "/edit" in gsheet_url:
@@ -327,7 +352,7 @@ async def parse_source(
                 resp = requests.get(export_url, timeout=10)
                 if resp.status_code == 200:
                     df = pd.read_csv(io.BytesIO(resp.content), dtype=str)
-                    phone_list.extend(extract_phone_numbers(df))
+                    items.extend(extract_phone_numbers(df))
         except: pass
 
     if file_source:
@@ -335,28 +360,35 @@ async def parse_source(
         contents = await file_source.read()
         if filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contents), dtype=str)
-            phone_list.extend(extract_phone_numbers(df))
+            items.extend(extract_phone_numbers(df))
         elif filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(contents), dtype=str)
-            phone_list.extend(extract_phone_numbers(df))
-        elif filename.endswith(".pdf"):
-            with pdfplumber.open(io.BytesIO(contents)) as pdf:
-                full_text = ""
-                for page in pdf.pages:
-                    full_text += page.extract_text() or ""
-                found = re.findall(r'\+?\d{10,15}', full_text)
-                phone_list.extend(found)
+            items.extend(extract_phone_numbers(df))
 
-    seen = set()
-    unique = []
-    for p in phone_list:
-        p = p.replace(" ", "").replace("-", "").replace(".0", "")
-        if not p.startswith('+'): p = '+' + p
-        if p not in seen and len(p) > 10:
-            seen.add(p)
-            unique.append(p)
+    return {"status": "success", "count": len(items), "items": items[:500]}
 
-    return {"status": "success", "count": len(unique), "numbers": unique[:500]}
+@app.get("/download-report")
+async def download_report():
+    if not sending_status["campaign_report"]:
+        return {"error": "No report available"}
+    
+    df = pd.DataFrame(sending_status["campaign_report"])
+    path = os.path.join(UPLOAD_DIR, "campaign_report.csv")
+    df.to_csv(path, index=False)
+    return FileResponse(path, filename="Campaign_Report.csv")
+
+@app.get("/download-template")
+async def download_template():
+    data = {
+        "Country_Code": ["91", "44"],
+        "Phone": ["9876543210", "7123456789"],
+        "Name": ["Rahul", "John"],
+        "City": ["Mumbai", "London"]
+    }
+    df = pd.DataFrame(data)
+    path = os.path.join(UPLOAD_DIR, "sample_template.xlsx")
+    df.to_excel(path, index=False)
+    return FileResponse(path, filename="WA_Bulk_Template.xlsx")
 
 @app.get("/logout")
 async def logout():
