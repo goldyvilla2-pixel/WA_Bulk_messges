@@ -12,17 +12,35 @@ app.use(bodyParser.json());
 
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, '.wwebjs_auth')
+        dataPath: path.join(__dirname, '..', 'SESSIONS')
     }),
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    },
     puppeteer: {
-        headless: true, // Run in background
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
+        headless: "new",
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ],
+        env: {
+            ...process.env,
+            PUPPETEER_DISABLE_HEADLESS_WARNING: 'true'
+        },
+        executablePath: undefined,
+    },
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 });
-
 let isReady = false;
 let currentQR = null;
 let deviceInfo = null;
+
 
 client.on('qr', (text) => {
     console.log('--- SCAN THIS QR CODE ---');
@@ -80,6 +98,13 @@ app.get('/status', (req, res) => {
     res.json({ ready: isReady, deviceInfo: deviceInfo });
 });
 
+client.on('error', (err) => {
+    console.error('💥 WhatsApp Client Error:', err);
+    if (err.message.includes('detached Frame')) {
+        console.log('🔄 Detached frame detected. Client may need restart.');
+    }
+});
+
 // Endpoint to send message
 app.post('/send', async (req, res) => {
     const { phone, message, imagePath } = req.body;
@@ -91,21 +116,62 @@ app.post('/send', async (req, res) => {
     try {
         const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
 
-        if (imagePath && fs.existsSync(imagePath)) {
-            const media = MessageMedia.fromFilePath(imagePath);
-            await client.sendMessage(chatId, media, { caption: message });
-            console.log(`🖼️ Sent image+caption to ${phone}`);
-        } else {
-            await client.sendMessage(chatId, message);
-            console.log(`✍️ Sent text to ${phone}`);
+        // Anti-Ban measure: Simulate typing
+        try {
+            console.log(`⏳ Simulating typing for ${phone}...`);
+            await client.sendPresenceUpdate('composing', chatId);
+            // Random typing duration between 3 to 7 seconds
+            await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+            await client.sendPresenceUpdate('paused', chatId);
+        } catch (presenceErr) {
+            console.log('Presence update failed (non-critical):', presenceErr.message);
         }
 
-        res.json({ success: true });
+        const attemptSend = async () => {
+            if (imagePath && fs.existsSync(imagePath)) {
+                const media = MessageMedia.fromFilePath(imagePath);
+                await client.sendMessage(chatId, media, { caption: message });
+                console.log(`🖼️ Sent image+caption to ${phone}`);
+            } else {
+                await client.sendMessage(chatId, message);
+                console.log(`✍️ Sent text to ${phone}`);
+            }
+        };
+
+        let retries = 3;
+        let lastError = null;
+
+        while (retries > 0) {
+            try {
+                await attemptSend();
+                return res.json({ success: true });
+            } catch (e) {
+                lastError = e;
+                if (e.message && (e.message.includes('detached Frame') || e.message.includes('Execution context'))) {
+                    console.log(`⚠️ Browser sync issue. Retrying send for ${phone}... (${retries - 1} left)`);
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 2500)); // wait 2.5s before retry
+                    }
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        // If we get here, all retries failed
+        throw lastError;
+
     } catch (err) {
-        console.error('Failed to send:', err);
-        res.status(500).json({ success: false, error: err.message });
+        console.error('❌ Failed to send:', err);
+        let errorMsg = err.message || "Unknown error";
+        if (errorMsg.includes('detached Frame') || errorMsg.includes('Execution context')) {
+            errorMsg = "Browser sync error (Detached Frame). Retries exhausted. Client may be disconnected.";
+        }
+        res.status(500).json({ success: false, error: errorMsg });
     }
 });
+
 
 const PORT = 3001;
 app.listen(PORT, () => {

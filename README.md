@@ -46,16 +46,24 @@ A powerful, human-mimicking WhatsApp bulk messaging tool built with FastAPI and 
    - Click **Start Bulk Send**.
    - **Scan the QR Code** that appears on the dashboard (only required the first time).
 
+## 🛡️ Anti-Ban Best Practices
+WhatsApp is very strict about bulk messaging. To keep your account safe:
+- **Warm up your account**: Don't use a brand-new WhatsApp account for bulk messaging. Use an account that has been active for at least a few weeks with regular personal chat history.
+- **Start Small**: Begin with 10-20 messages per day and gradually increase.
+- **Use High Delays**: We recommend a minimum delay of **45-60 seconds**.
+- **Message Variation**: Use the built-in "Unique Padding" feature. Avoid sending the exact same text to hundreds of people.
+- **Avoid Cold Contacts**: Sending messages to people who haven't saved your number increases the chance of being reported as spam.
+
 ## 📁 File Structure
-- `main.py`: The FastAPI backend.
-- `bridge/`: Node.js WhatsApp logic.
+- `main.py`: The FastAPI backend with "Smart Pause" logic.
+- `bridge/`: Node.js WhatsApp logic with "Typing Simulation".
 - `bridge/.wwebjs_auth/`: Stores your login session.
 - `frontend/`: HTML, CSS, and JS for the dashboard.
 - `uploads/`: Temporary storage for uploaded images.
 
 ## ⚠️ Important Notes
 - **Do not touch the browser**: Once the automated Chrome window opens, let it do its work. Interacting with it manually might break the sequence.
-- **Safety**: Keep your message delays high (20s+) to prevent WhatsApp from flagging your account.
+- **Safety**: The engine now includes **Smart Pauses** (every 10 messages) and **Typing Simulation** to mimic human behavior.
 - **Logout**: Use the button in the dashboard to clear your session and switch accounts.
 
 ---

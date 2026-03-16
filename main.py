@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 # Directories
 UPLOAD_DIR = os.path.abspath("uploads")
 BRIDGE_DIR = os.path.abspath("bridge")
-SESSION_DIR = os.path.abspath(os.path.join("bridge", ".wwebjs_auth"))
+SESSION_DIR = os.path.abspath("SESSIONS")
 
 def ensure_dirs():
-    for d in [UPLOAD_DIR, BRIDGE_DIR]:
+    for d in [UPLOAD_DIR, BRIDGE_DIR, SESSION_DIR]:
         os.makedirs(d, exist_ok=True)
 
 # Global status tracking
@@ -141,9 +141,15 @@ def bulk_send_task(numbers: List[str], message: str, image_path: str, delay: int
         
         try:
             sending_status["logs"].append(f"📤 Sending to {phone}...")
+            
+            # Anti-spam measure: Append random invisible (zero-width) characters
+            invisible_chars = ['\u200B', '\u200C', '\u200D', '\uFEFF', '\u200E', '\u200F']
+            unique_padding = "".join(random.choices(invisible_chars, k=random.randint(5, 12)))
+            unique_message = message + "\n" + unique_padding
+            
             payload = {
                 "phone": clean_phone,
-                "message": message,
+                "message": unique_message,
                 "imagePath": image_path if image_path else None
             }
             resp = requests.post("http://localhost:3001/send", json=payload, timeout=60)
@@ -154,11 +160,19 @@ def bulk_send_task(numbers: List[str], message: str, image_path: str, delay: int
                 raise Exception(resp.json().get("error", "Unknown error"))
         except Exception as e:
             sending_status["failed"] += 1
-            sending_status["logs"].append(f"⚠️ Failed for {phone}: {str(e)[:50]}")
+            sending_status["logs"].append(f"⚠️ Failed for {phone}: {str(e)}")
+
         
         if i < len(numbers) - 1:
-            wait = delay + random.randint(-2, 2)
-            time.sleep(max(1, wait))
+            # Smart Pause: every 10 messages, take a longer break
+            if (i + 1) % 10 == 0:
+                smart_wait = random.randint(60, 180) # 1 to 3 minutes
+                sending_status["logs"].append(f"🛌 Taking a Smart Pause for {smart_wait}s to stay stealthy...")
+                time.sleep(smart_wait)
+            else:
+                # Normal variation
+                wait = delay + random.randint(-5, 10) # More variation: -5s to +10s
+                time.sleep(max(5, wait))
 
     sending_status["step"] = "finished"
     sending_status["logs"].append("🏁 Bulk send completed!")
