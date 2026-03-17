@@ -584,6 +584,7 @@
                 <div class="form-group">
                     <div class="section-title">
                         <span>Recipient Source</span>
+                        <button type="button" onclick="clearFile('file_source', 'file-label')" id="clear-file" class="clear-btn" style="display: none;">✕</button>
                     </div>
                     
                     <div style="display: flex; gap: 5px; margin-bottom: 10px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px;">
@@ -591,7 +592,7 @@
                         <button type="button" onclick="switchSource('gsheet')" id="source-btn-gsheet" class="btn" style="flex:1; font-size: 0.75rem; padding: 8px; background: transparent; color: white;">Google Sheet</button>
                     </div>
 
-                    <div style="margin-bottom: 10px; display: flex; gap: 8px;">
+                    <div id="template-section" style="margin-bottom: 10px; display: flex; gap: 8px;">
                         <a href="/download-template?format=xlsx" class="btn" style="flex: 1; font-size: 0.65rem; padding: 6px; background: rgba(255,255,255,0.05); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
                             📥 Excel Template
                         </a>
@@ -854,6 +855,7 @@
             const sheetBtn = document.getElementById('source-btn-gsheet');
             const fileGroup = document.getElementById('file-input-group');
             const sheetGroup = document.getElementById('gsheet-input-group');
+            const templateSection = document.getElementById('template-section');
 
             if (type === 'file') {
                 fileBtn.style.background = 'var(--primary)';
@@ -862,6 +864,7 @@
                 sheetBtn.style.color = 'white';
                 fileGroup.style.display = 'block';
                 sheetGroup.style.display = 'none';
+                templateSection.style.display = 'flex';
                 document.getElementById('gsheet_url').value = '';
             } else {
                 sheetBtn.style.background = 'var(--primary)';
@@ -870,8 +873,10 @@
                 fileBtn.style.color = 'white';
                 fileGroup.style.display = 'none';
                 sheetGroup.style.display = 'block';
+                templateSection.style.display = 'none';
                 document.getElementById('file_source').value = '';
                 document.getElementById('file-label').innerText = 'Select CSV or Excel';
+                document.getElementById('clear-file').style.display = 'none';
             }
             document.getElementById('contacts-display').style.display = 'none';
             document.getElementById('val-total').innerText = '0';
@@ -882,6 +887,7 @@
             const label = document.getElementById('file-label');
             label.innerText = input.files[0].name;
             label.style.color = 'var(--primary)';
+            document.getElementById('clear-file').style.display = 'flex';
             
             const formData = new FormData();
             formData.append('file_source', input.files[0]);
@@ -1005,7 +1011,8 @@
                     currentItems = [];
                     logsIdx = 0;
                     document.getElementById('file_source').value = '';
-                    document.getElementById('file_name_display').innerText = 'No file chosen';
+                    document.getElementById('file-label').innerText = 'Select CSV or Excel';
+                    document.getElementById('clear-file').style.display = 'none';
                     document.getElementById('message').value = '';
                     document.getElementById('image').value = '';
                     document.getElementById('clear-img').style.display = 'none';
