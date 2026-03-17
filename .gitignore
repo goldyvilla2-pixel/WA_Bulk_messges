@@ -22,3 +22,4 @@ bridge_log.txt
 PyWhatKit_DB.txt
 .DS_Store
 *.log
+SESSIONS/
