@@ -16,10 +16,10 @@ const client = new Client({
     }),
     webVersionCache: {
         type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018.x.html',
     },
     puppeteer: {
-        headless: "new",
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -27,7 +27,11 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-sync'
         ],
         env: {
             ...process.env,
@@ -35,7 +39,7 @@ const client = new Client({
         },
         executablePath: undefined,
     },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 });
 let isReady = false;
 let currentQR = null;
@@ -146,7 +150,7 @@ app.post('/send', async (req, res) => {
             }
         };
 
-        let retries = 3;
+        let retries = 5;
         let lastError = null;
 
         while (retries > 0) {
@@ -155,11 +159,11 @@ app.post('/send', async (req, res) => {
                 return res.json({ status: 'success', success: true });
             } catch (e) {
                 lastError = e;
-                if (e.message && (e.message.includes('detached Frame') || e.message.includes('Execution context'))) {
+                if (e.message && (e.message.includes('detached Frame') || e.message.includes('Execution context') || e.message.includes('Navigating'))) {
                     console.log(`⚠️ Browser sync issue. Retrying send for ${phone}... (${retries - 1} left)`);
                     retries--;
                     if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 2500)); // wait 2.5s before retry
+                        await new Promise(r => setTimeout(r, 5000)); // wait 5s for re-attachment
                     }
                 } else {
                     throw e;
