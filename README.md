@@ -4,7 +4,6 @@ A powerful, human-mimicking WhatsApp bulk messaging tool built with FastAPI and 
 
 ## ✨ Features
 - **Multi-Message Rotation**: Add multiple versions of your message to defeat WhatsApp's anti-spam AI.
-- **Global Blacklist (DNC)**: Add numbers to a permanent Do-Not-Call list to auto-skip them.
 - **Human Mimicry**: Randomized messaging speeds, smart pauses, and typing simulation.
 - **Premium UI**: Drag & Drop file uploads and live typing previews.
 - **CSV/Excel Support**: Full personalization with `{{Variables}}` and Spintax.

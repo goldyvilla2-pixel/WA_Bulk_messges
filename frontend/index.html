@@ -555,54 +555,6 @@
             font-weight: 600;
         }
 
-        /* Blacklist Modal */
-        #blacklist-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 10000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: var(--card-bg);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            width: 90%;
-            max-width: 400px;
-            padding: 2rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .blacklist-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            background: rgba(0,0,0,0.2);
-            padding: 10px 12px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .brand-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: rgba(56, 189, 248, 0.1);
-            color: var(--primary);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            margin-right: 4px;
-            margin-top: 4px;
-        }
 
         /* Drag & Drop */
         .drag-over {
@@ -628,28 +580,6 @@
         </div>
     </div>
 
-    <div id="blacklist-modal">
-        <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <span class="section-title">🚫 Blacklist (DNC)</span>
-                <button onclick="closeBlacklist()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.5rem;">✕</button>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem;">
-                <input type="text" id="bl-input" placeholder="Phone No (e.g. 447...)" style="margin:0;">
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="bl-brand" placeholder="Brand Name or 'All'" style="margin:0; flex:1;">
-                    <button onclick="addToBlacklist()" class="btn btn-primary" style="padding: 0 15px;">Add Block</button>
-                </div>
-            </div>
-
-            <div id="bl-list" style="max-height: 250px; overflow-y: auto; padding-right: 5px; margin-top: 10px;">
-                <!-- Items here -->
-            </div>
-            
-            <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 1rem; text-align: center;">* Tip: Use "All" to block across every brand.</p>
-        </div>
-    </div>
 
     <div class="container">
         <!-- LEFT PANEL -->
@@ -715,17 +645,12 @@
                             <span class="slider round"></span>
                         </label>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <label style="margin:0;">Safe-Start 🔥</label>
                         <label class="switch">
                             <input type="checkbox" id="use_safe_start" checked>
                             <span class="slider round"></span>
                         </label>
-                    </div>
-                    <div style="text-align: right;">
-                        <button type="button" onclick="openBlacklist()" style="background: transparent; border: none; color: var(--danger); font-size: 0.75rem; text-decoration: underline; cursor: pointer;">
-                            🚫 Manage Blacklist (DNC)
-                        </button>
                     </div>
                 </div>
 
@@ -749,11 +674,6 @@
                     </button>
                 </div>
 
-                <div class="form-group">
-                    <label>Campaign Brand / Name 🏷️</label>
-                    <input type="text" id="brand_name" value="Global" placeholder="e.g. Nike, Adidas, MyBrand">
-                    <p style="font-size: 0.6rem; opacity: 0.5; margin-top: 0.2rem;">Used for brand-specific blacklisting.</p>
-                </div>
 
                 <div class="form-group">
                     <label>Delay (Sec)</label>
@@ -1204,68 +1124,6 @@
             }
         }
 
-        // BLACKLIST LOGIC
-        async function openBlacklist() {
-            document.getElementById('blacklist-modal').style.display = 'flex';
-            loadBlacklist();
-        }
-
-        function closeBlacklist() {
-            document.getElementById('blacklist-modal').style.display = 'none';
-        }
-
-        async function loadBlacklist() {
-            const resp = await fetch('/get-blacklist');
-            const data = await resp.json();
-            const list = document.getElementById('bl-list');
-            list.innerHTML = '';
-            
-            if (!data.blacklist || data.blacklist.length === 0) {
-                list.innerHTML = '<p style="text-align:center; opacity:0.4; font-size:0.8rem;">No numbers blacklisted.</p>';
-                return;
-            }
-
-            data.blacklist.forEach(entry => {
-                const item = document.createElement('div');
-                item.className = 'blacklist-item';
-                
-                let brandTags = '';
-                entry.brands.forEach(b => {
-                    brandTags += `<span class="brand-tag">${b} <span onclick="removeFromBlacklist('${entry.phone}', '${b}')" style="cursor:pointer; color:var(--danger); margin-left:5px;">✕</span></span>`;
-                });
-
-                item.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:0.9rem; font-weight:600;">+${entry.phone}</span>
-                    </div>
-                    <div>${brandTags}</div>
-                `;
-                list.appendChild(item);
-            });
-        }
-
-        async function addToBlacklist() {
-            const input = document.getElementById('bl-input');
-            const brandInput = document.getElementById('bl-brand');
-            if (!input.value) return;
-            
-            const fd = new FormData();
-            fd.append('phone', input.value);
-            fd.append('brand', brandInput.value || "All");
-            
-            await fetch('/add-to-blacklist', { method: 'POST', body: fd });
-            input.value = '';
-            brandInput.value = '';
-            loadBlacklist();
-        }
-
-        async function removeFromBlacklist(num, brand) {
-            const fd = new FormData();
-            fd.append('phone', num);
-            fd.append('brand', brand);
-            await fetch('/remove-from-blacklist', { method: 'POST', body: fd });
-            loadBlacklist();
-        }
 
         // DRAG & DROP LOGIC
         function initDragDrop() {
