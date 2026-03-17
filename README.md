@@ -3,12 +3,11 @@
 A powerful, human-mimicking WhatsApp bulk messaging tool built with FastAPI and WhatsApp-Web.js.
 
 ## ✨ Features
-- **CSV Support**: Upload numbers with separate country codes.
-- **Human Mimicry**: Randomized messaging speeds to avoid bans.
-- **Node Bridge**: Uses a headless WhatsApp-Web.js client for stability.
-- **QR Streaming**: View the WhatsApp QR code directly in the dashboard.
-- **Image Support**: Send captions with image attachments.
-- **Automatic Resume**: Saves your login session locally.
+- **Multi-Message Rotation**: Add multiple versions of your message to defeat WhatsApp's anti-spam AI.
+- **Global Blacklist (DNC)**: Add numbers to a permanent Do-Not-Call list to auto-skip them.
+- **Human Mimicry**: Randomized messaging speeds, smart pauses, and typing simulation.
+- **Premium UI**: Drag & Drop file uploads and live typing previews.
+- **CSV/Excel Support**: Full personalization with `{{Variables}}` and Spintax.
 
 ## 🛠️ Installation & Setup (Windows)
 
@@ -81,5 +80,3 @@ WhatsApp is very strict about bulk messaging. To keep your account safe:
 - **Safety**: The engine now includes **Smart Pauses** (every 10 messages) and **Typing Simulation** to mimic human behavior.
 - **Logout**: Use the button in the dashboard to clear your session and switch accounts.
 
----
-Built with ❤️ for Bulk Messaging.

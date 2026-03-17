@@ -554,6 +554,49 @@
             color: #fbbf24;
             font-weight: 600;
         }
+
+        /* Blacklist Modal */
+        #blacklist-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .blacklist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* Drag & Drop */
+        .drag-over {
+            background: rgba(56, 189, 248, 0.1) !important;
+            border-color: var(--primary) !important;
+            transform: scale(1.02);
+        }
     </style>
 </head>
 
@@ -569,6 +612,26 @@
                 REASON: <span id="fail-reason" style="color:white; font-size:1.1rem; opacity:0.8;">Unknown Error</span>
             </div>
             <button onclick="dismissAlert()" class="btn btn-primary" style="width:100%; font-size:1.2rem; padding:1.2rem;">OK, I UNDERSTAND</button>
+        </div>
+    </div>
+
+    <div id="blacklist-modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <span class="section-title">🚫 Blacklist (DNC)</span>
+                <button onclick="closeBlacklist()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.5rem;">✕</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
+                <input type="text" id="bl-input" placeholder="Enter Phone No..." style="margin:0; flex:1;">
+                <button onclick="addToBlacklist()" class="btn btn-primary" style="padding: 0 15px;">Add</button>
+            </div>
+
+            <div id="bl-list" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                <!-- Items here -->
+            </div>
+            
+            <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 1rem; text-align: center;">* Numbers in this list will be auto-skipped.</p>
         </div>
     </div>
 
@@ -636,12 +699,17 @@
                             <span class="slider round"></span>
                         </label>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <label style="margin:0;">Safe-Start 🔥</label>
                         <label class="switch">
                             <input type="checkbox" id="use_safe_start" checked>
                             <span class="slider round"></span>
                         </label>
+                    </div>
+                    <div style="text-align: right;">
+                        <button type="button" onclick="openBlacklist()" style="background: transparent; border: none; color: var(--danger); font-size: 0.75rem; text-decoration: underline; cursor: pointer;">
+                            🚫 Manage Blacklist (DNC)
+                        </button>
                     </div>
                 </div>
 
@@ -651,9 +719,18 @@
                         <p style="font-size: 0.7rem; color: var(--primary); font-weight: 600; margin-bottom: 4px;">💡 PRO TIPS:</p>
                         <p style="font-size: 0.65rem; margin-bottom: 4px;">• <b>Personalize:</b> Use <code style="color: #fbbf24;">{{Name}}</code> to auto-insert names from your file.</p>
                         <p style="font-size: 0.65rem;">• <b>Spintax:</b> Use <code style="color: #fbbf24;">{Hi|Hello|Hey}</code> to send a random variation (helps avoid bans).</p>
+                        <p style="font-size: 0.65rem;">• <b>Rotation:</b> Use multiple variations to mimic real human behavior.</p>
                     </div>
-                    <textarea id="message" rows="5" placeholder="Example: {Hi|Hello} {{Name}}, check out our new update!" required
-                        oninput="updatePreview()"></textarea>
+                    
+                    <div id="message-container">
+                        <div class="msg-variation" style="margin-bottom: 10px; position: relative;">
+                            <textarea class="message-input" rows="4" placeholder="Variation 1: Your message here..." required oninput="updatePreview()"></textarea>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="addMessageVariation()" id="add-var-btn" class="btn" style="width: 100%; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--primary); color: var(--primary); margin-bottom: 15px;">
+                        ➕ Add Message Variation (Anti-Ban Pro)
+                    </button>
                 </div>
 
                 <div class="form-group">
@@ -944,8 +1021,46 @@
             reader.readAsDataURL(input.files[0]);
         }
 
-        function updatePreview() {
-            let text = document.getElementById('message').value || "Your message will appear here...";
+        function addMessageVariation() {
+            const container = document.getElementById('message-container');
+            const div = document.createElement('div');
+            div.className = "msg-variation";
+            div.style.marginBottom = "10px";
+            div.style.position = "relative";
+            
+            const count = container.children.length + 1;
+            div.innerHTML = `
+                <textarea class="message-input" rows="4" placeholder="Variation ${count}: Your message here..." oninput="updatePreview()"></textarea>
+                <button type="button" onclick="this.parentElement.remove(); updatePreview();" style="position: absolute; right: 5px; top: 5px; background: rgba(239, 68, 68, 0.2); border: none; color: #ef4444; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.7rem;">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
+        let previewCycleIdx = 0;
+        let previewTimer = null;
+        let cycleInterval = null;
+
+        function updatePreview(manual = false) {
+            clearTimeout(previewTimer);
+            const inputs = document.querySelectorAll('.message-input');
+            if (inputs.length === 0) return;
+
+            if (manual) {
+                // If user typed, keep showing THIS variation
+                // But we don't know which one they typed in easily without passing event
+                // For now, let's just use the current index
+            }
+
+            let text = inputs[previewCycleIdx % inputs.length].value || "Your message will appear here...";
+            
+            // Show Variation Badge
+            const theaterTitle = document.querySelector('.theater-card .section-title');
+            if (inputs.length > 1) {
+                theaterTitle.innerHTML = `Execution Theater <span style="font-size:0.6rem; background:var(--primary); color:var(--bg); padding:2px 6px; border-radius:10px; margin-left:8px;">Preview: Var ${ (previewCycleIdx % inputs.length) + 1 }</span>`;
+            } else {
+                theaterTitle.innerText = "Execution Theater";
+            }
+
             const btnText = document.getElementById('btn_text').value;
             const btnUrl = document.getElementById('btn_url').value;
 
@@ -957,16 +1072,33 @@
                 return choices.split('|')[0];
             });
 
-            document.getElementById('preview-text').innerHTML = text.replace(/\n/g, '<br>');
-            
-            const ctaBox = document.getElementById('preview-cta');
-            if (btnText || btnUrl) {
-                ctaBox.style.display = "flex";
-                document.getElementById('cta-text-val').innerText = btnText || "Click Here";
-                document.getElementById('cta-link-val').innerText = btnUrl || "https://...";
-            } else {
-                ctaBox.style.display = "none";
-            }
+            const previewEl = document.getElementById('preview-text');
+            // Premium Typing Effect (Visual only)
+            previewEl.style.opacity = '0.5';
+            previewTimer = setTimeout(() => {
+                previewEl.innerHTML = text.replace(/\n/g, '<br>');
+                previewEl.style.opacity = '1';
+                
+                const ctaBox = document.getElementById('preview-cta');
+                if (btnText || btnUrl) {
+                    ctaBox.style.display = "flex";
+                    document.getElementById('cta-text-val').innerText = btnText || "Click Here";
+                    document.getElementById('cta-link-val').innerText = btnUrl || "https://...";
+                } else {
+                    ctaBox.style.display = "none";
+                }
+            }, 100);
+        }
+
+        function startPreviewCycle() {
+            clearInterval(cycleInterval);
+            cycleInterval = setInterval(() => {
+                const inputs = document.querySelectorAll('.message-input');
+                if (inputs.length > 1 && !sending_status.is_running) {
+                    previewCycleIdx++;
+                    updatePreview();
+                }
+            }, 5000);
         }
 
         async function startCampaign() {
@@ -982,7 +1114,13 @@
                 formData.append('gsheet_url', document.getElementById('gsheet_url').value);
             }
 
-            formData.append('message', document.getElementById('message').value);
+            const messageInputs = document.querySelectorAll('.message-input');
+            const messages = Array.from(messageInputs).map(i => i.value).filter(v => v.trim() !== "");
+            if (messages.length === 0) {
+                alert("Please add at least one message!");
+                return;
+            }
+            formData.append('messages_json', JSON.stringify(messages));
             formData.append('delay', document.getElementById('delay').value);
             formData.append('btn_text', document.getElementById('btn_text').value);
             formData.append('btn_url', document.getElementById('btn_url').value);
@@ -1013,7 +1151,15 @@
                     document.getElementById('file_source').value = '';
                     document.getElementById('file-label').innerText = 'Select CSV or Excel';
                     document.getElementById('clear-file').style.display = 'none';
-                    document.getElementById('message').value = '';
+                    
+                    // Clear all but first variation
+                    const container = document.getElementById('message-container');
+                    container.innerHTML = `
+                        <div class="msg-variation" style="margin-bottom: 10px; position: relative;">
+                            <textarea class="message-input" rows="4" placeholder="Variation 1: Your message here..." required oninput="updatePreview()"></textarea>
+                        </div>
+                    `;
+                    
                     document.getElementById('image').value = '';
                     document.getElementById('clear-img').style.display = 'none';
                     document.getElementById('preview-img').style.display = 'none';
@@ -1033,6 +1179,79 @@
             } catch (err) {
                 alert("Reset failed: " + err.message);
             }
+        }
+
+        // BLACKLIST LOGIC
+        async function openBlacklist() {
+            document.getElementById('blacklist-modal').style.display = 'flex';
+            loadBlacklist();
+        }
+
+        function closeBlacklist() {
+            document.getElementById('blacklist-modal').style.display = 'none';
+        }
+
+        async function loadBlacklist() {
+            const resp = await fetch('/get-blacklist');
+            const data = await resp.json();
+            const list = document.getElementById('bl-list');
+            list.innerHTML = '';
+            if (data.numbers.length === 0) {
+                list.innerHTML = '<p style="text-align:center; opacity:0.4; font-size:0.8rem;">No numbers blacklisted.</p>';
+                return;
+            }
+            data.numbers.forEach(num => {
+                const item = document.createElement('div');
+                item.className = 'blacklist-item';
+                item.innerHTML = `
+                    <span style="font-size:0.9rem;">+${num}</span>
+                    <button onclick="removeFromBlacklist('${num}')" style="background:transparent; border:none; color:var(--danger); cursor:pointer;">✕</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function addToBlacklist() {
+            const input = document.getElementById('bl-input');
+            if (!input.value) return;
+            const fd = new FormData();
+            fd.append('phone', input.value);
+            await fetch('/add-to-blacklist', { method: 'POST', body: fd });
+            input.value = '';
+            loadBlacklist();
+        }
+
+        async function removeFromBlacklist(num) {
+            const fd = new FormData();
+            fd.append('phone', num);
+            await fetch('/remove-from-blacklist', { method: 'POST', body: fd });
+            loadBlacklist();
+        }
+
+        // DRAG & DROP LOGIC
+        function initDragDrop() {
+            const wrappers = document.querySelectorAll('.file-input-wrapper');
+            wrappers.forEach(w => {
+                w.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    w.classList.add('drag-over');
+                });
+                w.addEventListener('dragleave', () => w.classList.remove('drag-over'));
+                w.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    w.classList.remove('drag-over');
+                    const file = e.dataTransfer.files[0];
+                    const input = w.querySelector('input');
+                    
+                    // Manually trigger change
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    input.files = dataTransfer.files;
+                    
+                    if (input.id === 'image') handleImageUpload(input);
+                    else handleSourceUpload(input);
+                });
+            });
         }
 
         async function logoutSession() {
@@ -1194,6 +1413,8 @@
 
         setInterval(pollStatus, 2000);
         pollStatus();
+        initDragDrop();
+        startPreviewCycle();
     </script>
 </body>
 

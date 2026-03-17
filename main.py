@@ -34,10 +34,14 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = os.path.abspath("uploads")
 BRIDGE_DIR = os.path.abspath("bridge")
 SESSION_DIR = os.path.abspath("SESSIONS")
+BLACKLIST_FILE = os.path.abspath("blacklist.txt")
 
 def ensure_dirs():
     for d in [UPLOAD_DIR, BRIDGE_DIR, SESSION_DIR]:
         os.makedirs(d, exist_ok=True)
+    if not os.path.exists(BLACKLIST_FILE):
+        with open(BLACKLIST_FILE, "w") as f:
+            pass
 
 # Global status tracking
 sending_status = {
@@ -117,6 +121,16 @@ async def get_status():
     resp["report_available"] = len(sending_status.get("campaign_report", [])) > 0
     return resp
 
+def load_blacklist():
+    if not os.path.exists(BLACKLIST_FILE): return set()
+    with open(BLACKLIST_FILE, "r") as f:
+        return set(line.strip() for line in f if line.strip())
+
+def save_blacklist(nums):
+    with open(BLACKLIST_FILE, "w") as f:
+        for n in sorted(list(nums)):
+            f.write(f"{n}\n")
+
 def parse_spintax(text: str) -> str:
     """Randomly picks one variation. Only matches if a '|' is present to avoid {{Tags}}"""
     while True:
@@ -136,7 +150,7 @@ def apply_variables(text: str, vars_dict: dict) -> str:
         text = pattern.sub(str(val), text)
     return text
 
-def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int, 
+def bulk_send_task(items: List[dict], messages: List[str], image_path: str, delay: int, 
                    btn_text: str = "", btn_url: str = "", 
                    use_spintax: bool = False, use_safe_start: bool = False):
     global sending_status
@@ -151,6 +165,8 @@ def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int,
     sending_status["step"] = "initializing"
     
     start_bridge()
+    
+    blacklist = load_blacklist()
     
     # Wait for connection
     connected = False
@@ -178,12 +194,24 @@ def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int,
         phone = item["phone"]
         vars = item.get("vars", {})
         
+        # Check Blacklist
+        clean_phone = phone.replace("+", "").replace(" ", "").replace("-", "")
+        if clean_phone in blacklist:
+            sending_status["logs"].append(f"🚫 Skipping {phone} (Blacklisted/DNC)")
+            sending_status["campaign_report"].append({
+                "phone": phone, "status": "Skipped", "error": "Blacklisted", "row": i+1, **vars
+            })
+            continue
+
         sending_status["current_index"] = i + 1
         sending_status["current_phone"] = phone
         clean_phone = phone.replace("+", "").replace(" ", "").replace("-", "")
         
+        # 0. Selection (Message Rotation)
+        message_to_send = messages[i % len(messages)]
+        
         # Initialize fresh message and URL for this item
-        final_msg = message
+        final_msg = message_to_send
         final_btn_url = btn_url
         
         # 1. Personalization (Run FIRST)
@@ -297,7 +325,7 @@ async def start_bulk(
     background_tasks: BackgroundTasks,
     items_json: str = Form(None), 
     gsheet_url: str = Form(""),
-    message: str = Form(...),
+    messages_json: str = Form(...),
     delay: int = Form(20),
     btn_text: str = Form(""),
     btn_url: str = Form(""),
@@ -307,6 +335,12 @@ async def start_bulk(
     file_source: UploadFile = File(None)
 ):
     final_items = []
+    import json
+
+    try:
+        messages = json.loads(messages_json)
+    except:
+        messages = [messages_json]
 
     if items_json:
         try:
@@ -345,7 +379,7 @@ async def start_bulk(
         with open(image_path, "wb") as f:
             f.write(await image.read())
 
-    background_tasks.add_task(bulk_send_task, final_items, message, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start)
+    background_tasks.add_task(bulk_send_task, final_items, messages, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start)
     return {"status": "started", "total": len(final_items)}
 
 @app.post("/parse-source")
@@ -439,6 +473,28 @@ async def reset_engine():
         pass
         
     return {"success": True}
+
+@app.get("/get-blacklist")
+async def get_blacklist():
+    return {"numbers": list(load_blacklist())}
+
+@app.post("/add-to-blacklist")
+async def add_to_blacklist(phone: str = Form(...)):
+    clean = phone.replace("+", "").replace(" ", "").replace("-", "")
+    if not clean: return {"success": False}
+    nums = load_blacklist()
+    nums.add(clean)
+    save_blacklist(nums)
+    return {"success": True}
+
+@app.post("/remove-from-blacklist")
+async def remove_from_blacklist(phone: str = Form(...)):
+    nums = load_blacklist()
+    if phone in nums:
+        nums.remove(phone)
+        save_blacklist(nums)
+    return {"success": True}
+
 async def logout():
     global bridge_process, sending_status
     logger.info("🚪 Logging out and clearing session...")
