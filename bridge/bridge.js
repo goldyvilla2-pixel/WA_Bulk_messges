@@ -107,7 +107,8 @@ client.on('error', (err) => {
 
 // Endpoint to send message
 app.post('/send', async (req, res) => {
-    const { phone, message, imagePath } = req.body;
+    const { phone, message, image, cta_text, cta_url } = req.body;
+    const imagePath = image; 
 
     if (!isReady) {
         return res.status(503).json({ error: 'Bridge not ready. Please scan QR code.' });
@@ -128,12 +129,19 @@ app.post('/send', async (req, res) => {
         }
 
         const attemptSend = async () => {
+            let finalMessage = message;
+            
+            // Append CTA Link if present
+            if (cta_text && cta_url) {
+                finalMessage += `\n\n*${cta_text}*\n${cta_url}`;
+            }
+
             if (imagePath && fs.existsSync(imagePath)) {
                 const media = MessageMedia.fromFilePath(imagePath);
-                await client.sendMessage(chatId, media, { caption: message });
+                await client.sendMessage(chatId, media, { caption: finalMessage });
                 console.log(`🖼️ Sent image+caption to ${phone}`);
             } else {
-                await client.sendMessage(chatId, message);
+                await client.sendMessage(chatId, finalMessage);
                 console.log(`✍️ Sent text to ${phone}`);
             }
         };
@@ -144,7 +152,7 @@ app.post('/send', async (req, res) => {
         while (retries > 0) {
             try {
                 await attemptSend();
-                return res.json({ success: true });
+                return res.json({ status: 'success', success: true });
             } catch (e) {
                 lastError = e;
                 if (e.message && (e.message.includes('detached Frame') || e.message.includes('Execution context'))) {

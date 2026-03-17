@@ -907,11 +907,19 @@
         }
 
         function updatePreview() {
-            const text = document.getElementById('message').value;
+            let text = document.getElementById('message').value || "Your message will appear here...";
             const btnText = document.getElementById('btn_text').value;
             const btnUrl = document.getElementById('btn_url').value;
 
-            document.getElementById('preview-text').innerText = text || "Your message will appear here...";
+            // Simple preview replacement (mocked)
+            text = text.replace(/\{\{\s*Name\s*\}\}/gi, "<b>(Recipient Name)</b>");
+            
+            // Mock spintax for preview (always picks first)
+            text = text.replace(/\{([^{}|]*\|[^{}]*)\}/g, (match, choices) => {
+                return choices.split('|')[0];
+            });
+
+            document.getElementById('preview-text').innerHTML = text.replace(/\n/g, '<br>');
             
             const ctaBox = document.getElementById('preview-cta');
             if (btnText || btnUrl) {

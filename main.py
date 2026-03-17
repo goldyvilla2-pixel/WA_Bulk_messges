@@ -111,9 +111,10 @@ async def get_status():
     return sending_status
 
 def parse_spintax(text: str) -> str:
-    """Randomly picks one variation from {Hi|Hello|Hey}"""
+    """Randomly picks one variation. Only matches if a '|' is present to avoid {{Tags}}"""
     while True:
-        match = re.search(r'\{([^{}]*)\}', text)
+        # Match {word1|word2} but ignore {tag}
+        match = re.search(r'\{([^{}|]*\|[^{}]*)\}', text)
         if not match:
             break
         choices = match.group(1).split('|')
@@ -121,10 +122,11 @@ def parse_spintax(text: str) -> str:
     return text
 
 def apply_variables(text: str, vars_dict: dict) -> str:
-    """Replaces {{Name}} with the value from vars_dict"""
+    """Replaces {{Name}} with the value from vars_dict. CASE INSENSITIVE."""
     for key, val in vars_dict.items():
-        placeholder = "{{" + str(key) + "}}"
-        text = text.replace(placeholder, str(val))
+        # Match {{Name}} or {{name}}
+        pattern = re.compile(re.escape("{{" + str(key) + "}}"), re.IGNORECASE)
+        text = pattern.sub(str(val), text)
     return text
 
 def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int, 
@@ -173,16 +175,19 @@ def bulk_send_task(items: List[dict], message: str, image_path: str, delay: int,
         sending_status["current_phone"] = phone
         clean_phone = phone.replace("+", "").replace(" ", "").replace("-", "")
         
-        # 1. Spintax
+        # Initialize fresh message and URL for this item
         final_msg = message
-        if use_spintax:
-            final_msg = parse_spintax(final_msg)
-            
-        # 2. Personalization
+        final_btn_url = btn_url
+        
+        # 1. Personalization (Run FIRST)
         final_msg = apply_variables(final_msg, vars)
         
+        # 2. Spintax (Run SECOND)
+        if use_spintax:
+            final_msg = parse_spintax(final_msg)
+        
         # 3. Dynamic Button URLs (can also have vars)
-        final_btn_url = apply_variables(btn_url, vars)
+        final_btn_url = apply_variables(final_btn_url, vars)
         
         try:
             sending_status["logs"].append(f"📤 [{i+1}/{len(items)}] Sending to {phone}...")
