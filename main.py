@@ -112,7 +112,10 @@ async def get_status():
         sending_status["connected_user"] = None
         sending_status["qr_code"] = None
         
-    return sending_status
+    # Add report availability flag
+    resp = sending_status.copy()
+    resp["report_available"] = len(sending_status.get("campaign_report", [])) > 0
+    return resp
 
 def parse_spintax(text: str) -> str:
     """Randomly picks one variation. Only matches if a '|' is present to avoid {{Tags}}"""
