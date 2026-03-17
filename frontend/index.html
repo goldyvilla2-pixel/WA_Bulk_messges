@@ -781,8 +781,8 @@
                             <span id="count-badge" style="background: var(--primary); color: var(--bg); padding: 2px 10px; border-radius: 4px; font-size: 0.9rem; font-weight: 600;">0</span>
                         </div>
 
-                        <div id="report-section" style="display: none; margin-top: 10px;">
-                            <a href="/download-report" class="btn btn-primary" style="width: 100%; font-size: 0.8rem; background: var(--success); color: white; text-decoration: none; text-align: center;">
+                        <div id="report-section" style="margin-top: 10px;">
+                            <a id="report-download-link" href="/download-report" class="btn btn-primary" style="width: 100%; font-size: 0.8rem; background: var(--success); color: white; text-decoration: none; text-align: center; opacity: 0.4; pointer-events: none; transition: all 0.3s ease;">
                                 📊 Download Campaign Report
                             </a>
                         </div>
@@ -1125,8 +1125,15 @@
                 document.getElementById('start-btn').style.display = data.is_running ? 'none' : 'block';
                 document.getElementById('stop-btn').style.display = data.is_running ? 'block' : 'none';
 
+                const reportLink = document.getElementById('report-download-link');
                 if (!data.is_running && (data.step === 'finished' || data.step === 'stopped_on_error')) {
-                    document.getElementById('report-section').style.display = 'block';
+                    reportLink.style.opacity = '1';
+                    reportLink.style.pointerEvents = 'auto';
+                    reportLink.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';
+                } else {
+                    reportLink.style.opacity = '0.4';
+                    reportLink.style.pointerEvents = 'none';
+                    reportLink.style.boxShadow = 'none';
                 }
 
                 // Failure Alert
