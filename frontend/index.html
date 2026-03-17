@@ -671,9 +671,14 @@
                     <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 0.5rem;">* Note: In Standard WhatsApp, CTAs are sent as "Smart Links" for maximum account safety.</p>
                 </div>
 
-                <button type="submit" id="start-btn" class="btn btn-primary">🚀 Launch Engine</button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" id="start-btn" class="btn btn-primary" style="flex: 2;">🚀 Launch Engine</button>
+                    <button type="button" id="reset-btn" onclick="resetEngine()" class="btn" style="flex: 1; background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.3); color: #94a3b8; font-size: 0.8rem;">
+                        🔄 Reset
+                    </button>
+                </div>
                 <button type="button" id="stop-btn" onclick="stopCampaign()" class="btn btn-danger"
-                    style="display: none;">🛑 Stop Engine</button>
+                    style="display:none; width: 100%;">🛑 Stop Engine</button>
             </form>
         </div>
 
@@ -989,6 +994,39 @@
         }
 
         async function stopCampaign() { await fetch('/stop-task'); }
+
+        async function resetEngine() {
+            if (!confirm("Are you sure you want to reset everything? This will clear logs, stats, and uploaded data.")) return;
+            
+            try {
+                const resp = await fetch('/reset-engine', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    currentItems = [];
+                    logsIdx = 0;
+                    document.getElementById('file_source').value = '';
+                    document.getElementById('file_name_display').innerText = 'No file chosen';
+                    document.getElementById('message').value = '';
+                    document.getElementById('image').value = '';
+                    document.getElementById('clear-img').style.display = 'none';
+                    document.getElementById('preview-img').style.display = 'none';
+                    document.getElementById('preview-img').src = '';
+                    document.getElementById('log-container').innerHTML = '';
+                    
+                    // Reset toggles if you want
+                    document.getElementById('use_spintax').checked = false;
+                    document.getElementById('use_safe_start').checked = false;
+                    
+                    updatePreview();
+                    pollStatus();
+                    alert("Dashboard Reset Successfully!");
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert("Reset failed: " + err.message);
+            }
+        }
 
         async function logoutSession() {
             if (confirm("Logout and switch account?")) {

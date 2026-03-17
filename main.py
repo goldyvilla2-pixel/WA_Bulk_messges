@@ -406,7 +406,36 @@ async def download_template(format: str = "xlsx"):
         df.to_excel(path, index=False, engine='openpyxl')
         return FileResponse(path, filename="WA_Bulk_Template.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-@app.get("/logout")
+@app.post("/reset-engine")
+async def reset_engine():
+    global sending_status
+    if sending_status["is_running"]:
+        return {"success": False, "error": "Cannot reset while engine is running."}
+    
+    # Reset status
+    sending_status = {
+        "is_running": False,
+        "total": 0,
+        "success": 0,
+        "failed": 0,
+        "current_index": 0,
+        "current_phone": "",
+        "logs": [],
+        "connected_user": sending_status.get("connected_user"), # Keep the user
+        "qr_code": sending_status.get("qr_code"), # Keep QR if present
+        "step": "idle",
+        "last_failed_info": None,
+        "campaign_report": []
+    }
+    
+    # Clear uploads
+    try:
+        shutil.rmtree(UPLOAD_DIR)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+    except:
+        pass
+        
+    return {"success": True}
 async def logout():
     global bridge_process, sending_status
     logger.info("🚪 Logging out and clearing session...")
