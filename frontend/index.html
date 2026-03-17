@@ -985,7 +985,6 @@
             try {
                 const resp = await fetch('/start-bulk', { method: 'POST', body: formData });
                 const data = await resp.json();
-                document.getElementById('report-section').style.display = 'none';
             } catch (err) { alert(err.message); }
         }
 
@@ -1126,7 +1125,7 @@
                 document.getElementById('stop-btn').style.display = data.is_running ? 'block' : 'none';
 
                 const reportLink = document.getElementById('report-download-link');
-                if (!data.is_running && (data.step === 'finished' || data.step === 'stopped_on_error')) {
+                if (data.report_available && !data.is_running) {
                     reportLink.style.opacity = '1';
                     reportLink.style.pointerEvents = 'auto';
                     reportLink.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';

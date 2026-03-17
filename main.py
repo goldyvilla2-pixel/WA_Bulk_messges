@@ -88,7 +88,11 @@ async def get_status():
     try:
         bridge_resp = requests.get("http://localhost:3001/status", timeout=1).json()
         if bridge_resp.get("ready"):
-            sending_status["step"] = "sending" if sending_status["is_running"] else "connected"
+            if sending_status["is_running"]:
+                sending_status["step"] = "sending"
+            elif sending_status["step"] not in ["finished", "stopped_on_error"]:
+                 sending_status["step"] = "connected"
+            
             sending_status["qr_code"] = None
             sending_status["connected_user"] = bridge_resp.get("deviceInfo")
         else:
