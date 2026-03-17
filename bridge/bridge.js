@@ -131,9 +131,9 @@ app.post('/send', async (req, res) => {
         const attemptSend = async () => {
             let finalMessage = message;
             
-            // Append CTA Link if present
+            // Append Smart-CTA Link if present (Safe for Non-API accounts)
             if (cta_text && cta_url) {
-                finalMessage += `\n\n*${cta_text}*\n${cta_url}`;
+                finalMessage += `\n\n_________________________\n🔗 *${cta_text}*\n${cta_url}`;
             }
 
             if (imagePath && fs.existsSync(imagePath)) {

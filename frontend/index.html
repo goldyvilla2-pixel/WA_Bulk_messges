@@ -467,6 +467,33 @@
             }
         }
 
+        /* --- CTA REALISTIC PREVIEW --- */
+        .preview-cta {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            display: none; /* Controlled by JS */
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .cta-label-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            color: #333;
+            font-size: 0.85rem;
+        }
+
+        .cta-link-row {
+            color: #0645ad;
+            font-size: 0.8rem;
+            text-decoration: underline;
+            word-break: break-all;
+            opacity: 0.9;
+        }
+
         /* Hide Scrollbars */
         ::-webkit-scrollbar {
             width: 4px;
@@ -641,7 +668,7 @@
                     <input type="text" id="btn_text" placeholder="e.g. Chat with Us" oninput="updatePreview()">
                     <label style="margin-top: 0.5rem;">Button URL / Link</label>
                     <input type="text" id="btn_url" placeholder="https://..." oninput="updatePreview()">
-                    <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 0.5rem;">* Buttons in standard WA are sent as Link-Previews for maximum safety.</p>
+                    <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 0.5rem;">* Note: In Standard WhatsApp, CTAs are sent as "Smart Links" for maximum account safety.</p>
                 </div>
 
                 <button type="submit" id="start-btn" class="btn btn-primary">🚀 Launch Engine</button>
@@ -692,12 +719,12 @@
                                 <img id="preview-img" style="display:none;" src="" />
                                 <div id="preview-text">Your message will appear here...</div>
                                 
-                                <div id="preview-cta" style="display:none; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.1); flex-direction: column; align-items: stretch;">
-                                    <div id="cta-button-mock" style="background: #fff; color: #008069; padding: 8px; border-radius: 6px; text-align: center; font-weight: 600; font-size: 0.8rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #008069; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <div id="preview-cta" class="preview-cta">
+                                    <div class="cta-label-row">
+                                        <span>🔗</span>
                                         <span id="cta-text-val">Visit Website</span>
-                                        <span style="font-size: 10px;">↗</span>
                                     </div>
-                                    <div id="cta-link-val" style="font-size: 0.7rem; color: #0645ad; margin-top: 4px; text-align: center; opacity: 0.7;">https://example.com</div>
+                                    <div id="cta-link-val" class="cta-link-row">https://example.com</div>
                                 </div>
 
                                 <div class="wa-footer">
