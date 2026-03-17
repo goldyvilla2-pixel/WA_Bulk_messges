@@ -582,13 +582,26 @@
 
         .blacklist-item {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 4px;
             background: rgba(0,0,0,0.2);
-            padding: 8px 12px;
+            padding: 10px 12px;
             border-radius: 8px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .brand-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            margin-right: 4px;
+            margin-top: 4px;
         }
 
         /* Drag & Drop */
@@ -622,16 +635,19 @@
                 <button onclick="closeBlacklist()" style="background:transparent; border:none; color:white; cursor:pointer; font-size:1.5rem;">✕</button>
             </div>
             
-            <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-                <input type="text" id="bl-input" placeholder="Enter Phone No..." style="margin:0; flex:1;">
-                <button onclick="addToBlacklist()" class="btn btn-primary" style="padding: 0 15px;">Add</button>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem;">
+                <input type="text" id="bl-input" placeholder="Phone No (e.g. 447...)" style="margin:0;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="bl-brand" placeholder="Brand Name or 'All'" style="margin:0; flex:1;">
+                    <button onclick="addToBlacklist()" class="btn btn-primary" style="padding: 0 15px;">Add Block</button>
+                </div>
             </div>
 
-            <div id="bl-list" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+            <div id="bl-list" style="max-height: 250px; overflow-y: auto; padding-right: 5px; margin-top: 10px;">
                 <!-- Items here -->
             </div>
             
-            <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 1rem; text-align: center;">* Numbers in this list will be auto-skipped.</p>
+            <p style="font-size: 0.65rem; opacity: 0.5; margin-top: 1rem; text-align: center;">* Tip: Use "All" to block across every brand.</p>
         </div>
     </div>
 
@@ -731,6 +747,12 @@
                     <button type="button" onclick="addMessageVariation()" id="add-var-btn" class="btn" style="width: 100%; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--primary); color: var(--primary); margin-bottom: 15px;">
                         ➕ Add Message Variation (Anti-Ban Pro)
                     </button>
+                </div>
+
+                <div class="form-group">
+                    <label>Campaign Brand / Name 🏷️</label>
+                    <input type="text" id="brand_name" value="Global" placeholder="e.g. Nike, Adidas, MyBrand">
+                    <p style="font-size: 0.6rem; opacity: 0.5; margin-top: 0.2rem;">Used for brand-specific blacklisting.</p>
                 </div>
 
                 <div class="form-group">
@@ -1122,6 +1144,7 @@
             }
             formData.append('messages_json', JSON.stringify(messages));
             formData.append('delay', document.getElementById('delay').value);
+            formData.append('brand', document.getElementById('brand_name').value);
             formData.append('btn_text', document.getElementById('btn_text').value);
             formData.append('btn_url', document.getElementById('btn_url').value);
             formData.append('use_spintax', document.getElementById('use_spintax').checked);
@@ -1196,16 +1219,26 @@
             const data = await resp.json();
             const list = document.getElementById('bl-list');
             list.innerHTML = '';
-            if (data.numbers.length === 0) {
+            
+            if (!data.blacklist || data.blacklist.length === 0) {
                 list.innerHTML = '<p style="text-align:center; opacity:0.4; font-size:0.8rem;">No numbers blacklisted.</p>';
                 return;
             }
-            data.numbers.forEach(num => {
+
+            data.blacklist.forEach(entry => {
                 const item = document.createElement('div');
                 item.className = 'blacklist-item';
+                
+                let brandTags = '';
+                entry.brands.forEach(b => {
+                    brandTags += `<span class="brand-tag">${b} <span onclick="removeFromBlacklist('${entry.phone}', '${b}')" style="cursor:pointer; color:var(--danger); margin-left:5px;">✕</span></span>`;
+                });
+
                 item.innerHTML = `
-                    <span style="font-size:0.9rem;">+${num}</span>
-                    <button onclick="removeFromBlacklist('${num}')" style="background:transparent; border:none; color:var(--danger); cursor:pointer;">✕</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.9rem; font-weight:600;">+${entry.phone}</span>
+                    </div>
+                    <div>${brandTags}</div>
                 `;
                 list.appendChild(item);
             });
@@ -1213,17 +1246,23 @@
 
         async function addToBlacklist() {
             const input = document.getElementById('bl-input');
+            const brandInput = document.getElementById('bl-brand');
             if (!input.value) return;
+            
             const fd = new FormData();
             fd.append('phone', input.value);
+            fd.append('brand', brandInput.value || "All");
+            
             await fetch('/add-to-blacklist', { method: 'POST', body: fd });
             input.value = '';
+            brandInput.value = '';
             loadBlacklist();
         }
 
-        async function removeFromBlacklist(num) {
+        async function removeFromBlacklist(num, brand) {
             const fd = new FormData();
             fd.append('phone', num);
+            fd.append('brand', brand);
             await fetch('/remove-from-blacklist', { method: 'POST', body: fd });
             loadBlacklist();
         }
