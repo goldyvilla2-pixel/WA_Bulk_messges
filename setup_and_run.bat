@@ -1,121 +1,115 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 
-:: --- CONFIGURATION ---
-SET "APP_URL=http://localhost:8000"
-SET "PYTHON_REQS=requirements.txt"
-SET "BRIDGE_DIR=bridge"
+:: ---------------------------------------------------------
+:: MASTODONITTECH - FLAT STARTUP SCRIPT
+:: This version avoids nested IF/ELSE blocks to prevent 
+:: common batch syntax errors with paths.
+:: ---------------------------------------------------------
 
 echo ====================================================
 echo   🚀 MASTODONITTECH - SMART AUTO-SETUP
 echo ====================================================
 echo.
 
-:: 1. SMART PYTHON DETECTION
+:: 0. PRE-START CLEANUP
+echo [*] Cleaning up old processes...
+taskkill /F /IM python.exe /T >nul 2>&1
+taskkill /F /IM node.exe /T >nul 2>&1
+echo [OK] Fresh environment ready.
+echo.
+
+:: 1. PYTHON CHECK
 echo [*] Checking for Python...
 SET "PYTHON_EXE=python"
 python --version >nul 2>&1
-IF %ERRORLEVEL% NEQ 0 (
-    echo [!] 'python' not found in PATH. Searching common folders...
-    FOR /D %%i IN ("%LocalAppData%\Programs\Python\Python*") DO (
-        IF EXIST "%%i\python.exe" (
-            SET "PYTHON_EXE=%%i\python.exe"
-            echo [OK] Found Python at: %%i
-            GOTO :PYTHON_FOUND
-        )
-    )
-    
-    :: Try 'py' launcher
-    py --version >nul 2>&1
-    IF %ERRORLEVEL% EQU 0 (
-        SET "PYTHON_EXE=py"
-        echo [OK] Using Python Launcher 'py'
-        GOTO :PYTHON_FOUND
-    )
+IF %ERRORLEVEL% EQU 0 GOTO :PYTHON_OK
 
-    echo.
-    echo ❌ ERROR: Python not detected!
-    echo ----------------------------------------------------
-    echo To fix this:
-    echo 1. Download Python from: https://www.python.org/downloads/
-    echo 2. RUN the installer and **Check the box: "Add Python to PATH"**
-    echo 3. If already installed, please Re-install and check that box.
-    echo ----------------------------------------------------
-    pause
-    exit /b
+:: Try common path
+FOR /D %%i IN ("%LocalAppData%\Programs\Python\Python*") DO (
+    IF EXIST "%%i\python.exe" (
+        SET "PYTHON_EXE=%%i\python.exe"
+        GOTO :PYTHON_OK
+    )
 )
-:PYTHON_FOUND
 
-:: 2. SMART NODE.JS DETECTION
+:: Try launcher
+py --version >nul 2>&1
+IF %ERRORLEVEL% EQU 0 (
+    SET "PYTHON_EXE=py"
+    GOTO :PYTHON_OK
+)
+
+echo ❌ ERROR: Python not detected!
+echo Please install Python and check "Add to PATH"
+pause
+exit /b
+
+:PYTHON_OK
+echo [OK] Using Python: %PYTHON_EXE%
+
+:: 2. NODE CHECK
 echo [*] Checking for Node.js...
 SET "NODE_EXE=node"
 node --version >nul 2>&1
-IF %ERRORLEVEL% NEQ 0 (
-    echo [!] 'node' not found in PATH. Searching common folders...
-    IF EXIST "C:\Program Files\nodejs\node.exe" (
-        SET "NODE_EXE=C:\Program Files\nodejs\node.exe"
-        echo [OK] Found Node.js at: C:\Program Files\nodejs
-    ) ELSE IF EXIST "%ProgramFiles(x86)%\nodejs\node.exe" (
-        SET "NODE_EXE=%ProgramFiles(x86)%\nodejs\node.exe"
-        echo [OK] Found Node.js at: %ProgramFiles(x86)%\nodejs
-    ) ELSE (
-        echo.
-        echo ❌ ERROR: Node.js not detected!
-        echo ----------------------------------------------------
-        echo To fix this:
-        echo 1. Download Node.js from: https://nodejs.org/ (LTS Version)
-        echo 2. Run the installer and click 'Next' until finished.
-        echo 3. Restart your computer if it still fails.
-        echo ----------------------------------------------------
-        pause
-        exit /b
-    )
+IF %ERRORLEVEL% EQU 0 GOTO :NODE_OK
+
+IF EXIST "C:\Program Files\nodejs\node.exe" (
+    SET "NODE_EXE=C:\Program Files\nodejs\node.exe"
+    GOTO :NODE_OK
 )
 
-:: 3. Install Python Dependencies
+:: Check x86 path manually to avoid variable expansion issues with parens
+IF EXIST "C:\Program Files (x86)\nodejs\node.exe" (
+    SET "NODE_EXE=C:\Program Files (x86)\nodejs\node.exe"
+    GOTO :NODE_OK
+)
+
+echo ❌ ERROR: Node.js not detected!
+echo Please install Node.js (LTS) from nodejs.org
+pause
+exit /b
+
+:NODE_OK
+echo [OK] Using Node.js: %NODE_EXE%
+
+:: 3. DEPENDENCIES
 echo.
 echo [1/3] Checking Python dependencies...
-"%PYTHON_EXE%" -m pip install -r %PYTHON_REQS% --quiet
-IF %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Dependency check failed. Trying force install...
+"%PYTHON_EXE%" -m pip install -r requirements.txt --quiet
+IF !ERRORLEVEL! NEQ 0 (
+    echo [!] Standard install failed. Trying minimal install...
     "%PYTHON_EXE%" -m pip install fastapi uvicorn python-multipart pandas requests openpyxl pdfplumber --quiet
 )
 
-:: 4. Install Node.js Dependencies
-echo [2/3] Checking Node.js bridge dependencies...
-IF EXIST "%BRIDGE_DIR%\node_modules" (
-    echo [OK] Bridge ready.
-) ELSE (
-    echo [!] Installing bridge components (please wait)...
-    pushd %BRIDGE_DIR%
-    call npm install --no-fund --no-audit --quiet
-    popd
-)
+echo [2/3] Checking Node.js bridge...
+IF EXIST "bridge\node_modules" GOTO :BRIDGE_OK
+echo [!] Installing bridge components...
+pushd bridge
+call npm install --no-fund --no-audit --quiet
+popd
 
-:: 5. Launch the Application
-echo [3/3] Starting Engine and Launching UI...
+:BRIDGE_OK
+echo [OK] Bridge ready.
 
-:: Start the Python server
+:: 4. LAUNCH
+echo [3/3] Starting Engine...
 start "WATI Backend" /min "%PYTHON_EXE%" main.py
 
-:: Wait for initialization
+echo [*] Waiting for initialization...
 timeout /t 5 /nobreak >nul
 
-:: Launch Dashboard
-start %APP_URL%
+echo [OK] Launching Dashboard...
+start http://localhost:8000
 
-echo.
 echo ====================================================
 echo   ✅ ENGINE RUNNING SUCCESSFULLY! 
 echo ====================================================
-echo   - App URL: %APP_URL%
-echo   - Status: Connected
-echo.
 echo   Keep this window open. Press any key to stop all.
 echo ====================================================
 pause
 
-:: Cleanup on exit
+:: CLEANUP
 taskkill /F /IM python.exe /T >nul 2>&1
 taskkill /F /IM node.exe /T >nul 2>&1
 exit

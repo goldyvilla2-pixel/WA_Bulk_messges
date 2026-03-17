@@ -12,7 +12,10 @@ app.use(bodyParser.json());
 
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, '..', 'SESSIONS')
+        dataPath: path.join(__dirname, '..', 'SESSIONS'),
+        clientId: fs.existsSync(path.join(__dirname, '..', 'session_id.txt')) 
+                  ? fs.readFileSync(path.join(__dirname, '..', 'session_id.txt'), 'utf8').trim() 
+                  : 'default'
     }),
     webVersionCache: {
         type: 'remote',
@@ -100,6 +103,23 @@ client.on('disconnected', (reason) => {
 // Endpoint to check status
 app.get('/status', (req, res) => {
     res.json({ ready: isReady, deviceInfo: deviceInfo });
+});
+
+// Endpoint to logout cleanly
+app.get('/logout', async (req, res) => {
+    console.log('🚪 Logout requested. Cleaning up...');
+    try {
+        if (client) {
+            await client.logout();
+            isReady = false;
+            deviceInfo = null;
+            currentQR = null;
+        }
+        res.json({ success: true });
+    } catch (e) {
+        console.log('Logout error (might be already disconnected):', e.message);
+        res.json({ success: true }); // Still return success to allow folder deletion
+    }
 });
 
 client.on('error', (err) => {

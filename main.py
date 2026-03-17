@@ -106,9 +106,14 @@ async def get_status():
                 sending_status["step"] = "initializing"
     except:
         # Bridge is likely down, restart it
-        logger.warning("Bridge offline, restarting...")
-        start_bridge()
-        sending_status["step"] = "starting_bridge"
+        # Only restart if we are NOT in the middle of a logout or waiting period
+        if sending_status["step"] not in ["logging_out", "waiting_for_restart"]:
+            logger.warning("Bridge offline, restarting...")
+            start_bridge()
+            sending_status["step"] = "starting_bridge"
+        else:
+            logger.info(f"Bridge is offline (Step: {sending_status['step']}), waiting...")
+            
         sending_status["connected_user"] = None
         sending_status["qr_code"] = None
         
@@ -443,55 +448,99 @@ async def reset_engine():
     
     # Clear uploads
     try:
-        shutil.rmtree(UPLOAD_DIR)
+        if os.path.exists(UPLOAD_DIR):
+            shutil.rmtree(UPLOAD_DIR)
         os.makedirs(UPLOAD_DIR, exist_ok=True)
     except:
         pass
+    
+    return {"success": True}
         
-@app.post("/logout")
+@app.get("/logout")
 async def logout():
     global bridge_process, sending_status
-    logger.info("🚪 Logging out and clearing session...")
+    logger.info("🚨 INITIATING HARD LOGOUT...")
+    
+    sending_status["step"] = "logging_out"
+    sending_status["logs"].append("🛑 Stopping engine and clearing all data...")
+    
     try:
-        # 1. Full Reset of All Stats and Logs
-        sending_status.update({
-            "is_running": False,
-            "current_index": 0,
-            "total": 0,
-            "success": 0,
-            "failed": 0,
-            "logs": ["✨ Session cleared. Ready for new connection."],
-            "step": "logout_reset",
-            "qr_code": None,
-            "connected_user": None
-        })
+        # 1. Try a clean logout through the bridge API first
+        try:
+            import requests
+            requests.get("http://localhost:3001/logout", timeout=3)
+            logger.info("✅ Bridge logout command sent.")
+        except: pass
         
-        # 2. Kill specifically Node
-        subprocess.run("taskkill /F /IM node.exe /T", shell=True, capture_output=True)
+        time.sleep(2) # Give it a moment to disconnect
+
+        # 2. Kill Node and Drivers (but NOT chrome.exe to avoid closing user browser)
+        if os.name == 'nt': # Windows
+            subprocess.run("taskkill /F /IM node.exe /T", shell=True, capture_output=True)
+            subprocess.run("taskkill /F /IM chromedriver.exe /T", shell=True, capture_output=True)
+            # We skip 'chrome.exe' here so the dashboard doesn't close
+        else: # Mac/Linux
+            subprocess.run(["pkill", "-9", "node"], capture_output=True)
+            subprocess.run(["pkill", "-9", "Google Chrome"], capture_output=True)
+        
         if bridge_process:
             try: bridge_process.kill()
             except: pass
             bridge_process = None
+
+        time.sleep(2) # Brief pause for processes to die
+
+        # 2. CLEAR ALL FILES (Deep Clean)
+        paths_to_clear = [SESSION_DIR, os.path.join(BRIDGE_DIR, ".wwebjs_cache"), os.path.join(BRIDGE_DIR, ".wwebjs_auth")]
         
-        # 3. Wipe session folder with retries
-        time.sleep(5) 
-        if os.path.exists(SESSION_DIR):
-            def remove_readonly(func, path, excinfo):
-                import stat
-                os.chmod(path, stat.S_IWRITE)
+        def remove_readonly(func, path, excinfo):
+            import stat
+            try:
+                if os.path.exists(path):
+                    os.chmod(path, stat.S_IWRITE)
                 func(path)
-                
-            for i in range(5):
-                try:
-                    shutil.rmtree(SESSION_DIR, onerror=remove_readonly)
-                    logger.info("✅ Session folder wiped.")
-                    break
-                except:
-                    time.sleep(2)
+            except: pass
+
+        for p in paths_to_clear:
+            if os.path.exists(p):
+                for attempt in range(3):
+                    try:
+                        if os.name == 'nt':
+                            subprocess.run(f'rd /s /q "{p}"', shell=True, capture_output=True)
+                        else:
+                            shutil.rmtree(p, onerror=remove_readonly)
+                        if not os.path.exists(p): break
+                    except: time.sleep(1)
+
+        # 3. CHANGE SESSION ID (This is the MAGIC fix)
+        # Even if files are locked, changing the ID forces a fresh folder
+        import uuid
+        new_id = str(uuid.uuid4())[:8]
+        with open("session_id.txt", "w") as f:
+            f.write(new_id)
+        logger.info(f"✨ Session ID changed to: {new_id}")
+
+        # 4. Final Reset of Stats
+        sending_status.update({
+            "is_running": False,
+            "success": 0,
+            "failed": 0,
+            "current_index": 0,
+            "total": 0,
+            "logs": ["✨ System reset. Waiting for engine to restart..."],
+            "step": "waiting_for_restart", 
+            "qr_code": None,
+            "connected_user": None
+        })
+        
+        time.sleep(2)
+        sending_status["step"] = "initializing"
+        sending_status["logs"].append("🎬 Engine restarting... scan the new QR code.")
             
         return {"status": "success"}
     except Exception as e:
-        logger.error(f"Logout error: {e}")
+        logger.error(f"Logout Error: {e}")
+        sending_status["step"] = "idle"
         return {"status": "error", "message": str(e)}
 
 @app.get("/force-kill")

@@ -65,6 +65,14 @@
             line-height: 1.2;
         }
 
+        .version-badge {
+            font-size: 0.65rem;
+            color: var(--success);
+            opacity: 0.5;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
         .logo-sub {
             font-size: 0.75rem;
             color: var(--primary);
@@ -585,7 +593,9 @@
         <!-- LEFT PANEL -->
         <div class="left-panel">
             <div class="logo-box">
-                <div class="logo-main">MASTODONITTECH</div>
+                <div class="logo-main" style="display: flex; align-items: baseline;">
+                    MASTODONITTECH <span class="version-badge">v1.3.1-FIX</span>
+                </div>
                 <div class="logo-sub">WA Bulk Message Shooter</div>
             </div>
 
@@ -639,6 +649,13 @@
 
                 <div class="form-group" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin:0;">Message Rotation</label>
+                        <label class="switch">
+                            <input type="checkbox" id="use_rotation" onchange="toggleRotationMode(this.checked)">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <label style="margin:0;">Spintax Mode</label>
                         <label class="switch">
                             <input type="checkbox" id="use_spintax">
@@ -669,7 +686,7 @@
                         </div>
                     </div>
 
-                    <button type="button" onclick="addMessageVariation()" id="add-var-btn" class="btn" style="width: 100%; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--primary); color: var(--primary); margin-bottom: 15px;">
+                    <button type="button" onclick="addMessageVariation()" id="add-var-btn" class="btn" style="width: 100%; font-size: 0.75rem; background: rgba(56, 189, 248, 0.1); border: 1px dashed var(--primary); color: var(--primary); margin-bottom: 15px; display: none;">
                         ➕ Add Message Variation (Anti-Ban Pro)
                     </button>
                 </div>
@@ -713,7 +730,7 @@
                     </div>
 
                     <!-- NEW LOGOUT BUTTON POSITION -->
-                    <button id="logout-btn-nav" onclick="logoutSession()" class="btn"
+                    <button id="logout-btn-nav" onclick="logoutSession(event)" class="btn"
                         style="display: none; margin-left: auto; background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); color: var(--danger); font-size: 0.75rem; padding: 5px 12px;">
                         Logout & Rescan 🔄
                     </button>
@@ -972,64 +989,85 @@
             
             const count = container.children.length + 1;
             div.innerHTML = `
-                <textarea class="message-input" rows="4" placeholder="Variation ${count}: Your message here..." oninput="updatePreview()"></textarea>
+                <textarea class="message-input" rows="4" placeholder="Variation ${count}: Your message here..." oninput="updatePreview()" onfocus="updatePreview()"></textarea>
                 <button type="button" onclick="this.parentElement.remove(); updatePreview();" style="position: absolute; right: 5px; top: 5px; background: rgba(239, 68, 68, 0.2); border: none; color: #ef4444; border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 0.7rem;">✕</button>
             `;
             container.appendChild(div);
+            div.querySelector('textarea').focus();
         }
 
         let previewCycleIdx = 0;
         let previewTimer = null;
         let cycleInterval = null;
 
-        function updatePreview(manual = false) {
-            clearTimeout(previewTimer);
-            const inputs = document.querySelectorAll('.message-input');
-            if (inputs.length === 0) return;
-
-            if (manual) {
-                // If user typed, keep showing THIS variation
-                // But we don't know which one they typed in easily without passing event
-                // For now, let's just use the current index
-            }
-
-            let text = inputs[previewCycleIdx % inputs.length].value || "Your message will appear here...";
-            
-            // Show Variation Badge
-            const theaterTitle = document.querySelector('.theater-card .section-title');
-            if (inputs.length > 1) {
-                theaterTitle.innerHTML = `Execution Theater <span style="font-size:0.6rem; background:var(--primary); color:var(--bg); padding:2px 6px; border-radius:10px; margin-left:8px;">Preview: Var ${ (previewCycleIdx % inputs.length) + 1 }</span>`;
-            } else {
-                theaterTitle.innerText = "Execution Theater";
-            }
-
-            const btnText = document.getElementById('btn_text').value;
-            const btnUrl = document.getElementById('btn_url').value;
-
-            // Simple preview replacement (mocked)
-            text = text.replace(/\{\{\s*Name\s*\}\}/gi, "<b>(Recipient Name)</b>");
-            
-            // Mock spintax for preview (always picks first)
-            text = text.replace(/\{([^{}|]*\|[^{}]*)\}/g, (match, choices) => {
-                return choices.split('|')[0];
-            });
-
-            const previewEl = document.getElementById('preview-text');
-            // Premium Typing Effect (Visual only)
-            previewEl.style.opacity = '0.5';
-            previewTimer = setTimeout(() => {
-                previewEl.innerHTML = text.replace(/\n/g, '<br>');
-                previewEl.style.opacity = '1';
-                
-                const ctaBox = document.getElementById('preview-cta');
-                if (btnText || btnUrl) {
-                    ctaBox.style.display = "flex";
-                    document.getElementById('cta-text-val').innerText = btnText || "Click Here";
-                    document.getElementById('cta-link-val').innerText = btnUrl || "https://...";
-                } else {
-                    ctaBox.style.display = "none";
+        function toggleRotationMode(enabled) {
+            document.getElementById('add-var-btn').style.display = enabled ? 'block' : 'none';
+            if (!enabled) {
+                // Remove all but first variation when disabled
+                const container = document.getElementById('message-container');
+                while (container.children.length > 1) {
+                    container.lastElementChild.remove();
                 }
-            }, 100);
+            }
+            updatePreview();
+        }
+
+        function updatePreview() {
+            try {
+                clearTimeout(previewTimer);
+                const inputs = document.querySelectorAll('.message-input');
+                if (inputs.length === 0) return;
+                
+                let targetIdx = previewCycleIdx % inputs.length;
+                const focused = document.activeElement;
+                if (focused && focused.classList.contains('message-input')) {
+                    const arr = Array.from(inputs);
+                    const idx = arr.indexOf(focused);
+                    if (idx !== -1) {
+                        targetIdx = idx;
+                        previewCycleIdx = idx;
+                    }
+                }
+
+                let text = inputs[targetIdx].value || "Your message will appear here...";
+                
+                // Show Variation Badge
+                const theaterTitle = document.querySelector('.preview-card .section-title');
+                if (theaterTitle) {
+                    if (inputs.length > 1) {
+                        theaterTitle.innerHTML = `Execution Theater <span style="font-size:0.6rem; background:var(--primary); color:var(--bg); padding:2px 6px; border-radius:10px; margin-left:8px;">Preview: Var ${ (targetIdx) + 1 }</span>`;
+                    } else {
+                        theaterTitle.innerText = "Execution Theater";
+                    }
+                }
+
+                const btnText = document.getElementById('btn_text').value;
+                const btnUrl = document.getElementById('btn_url').value;
+
+                // Simple preview replacements
+                let processedText = text.replace(/\{\{\s*Name\s*\}\}/gi, "<b>(Recipient Name)</b>");
+                processedText = processedText.replace(/\{([^{}|]*\|[^{}]*)\}/g, (match, choices) => choices.split('|')[0]);
+
+                const previewEl = document.getElementById('preview-text');
+                if (previewEl) {
+                    previewEl.innerHTML = processedText.replace(/\n/g, '<br>');
+                }
+
+                const ctaBox = document.getElementById('preview-cta');
+                if (ctaBox) {
+                    if (btnText.trim() || btnUrl.trim()) {
+                        ctaBox.style.display = "flex";
+                        const textVal = document.getElementById('cta-text-val');
+                        const urlVal = document.getElementById('cta-link-val');
+                        if (textVal) textVal.innerText = btnText || "Click Here";
+                        if (urlVal) urlVal.innerText = btnUrl || "https://...";
+                    } else {
+                        ctaBox.style.display = "none";
+                    }
+                }
+            } catch (err) {
+                console.error("Preview Update Error:", err);
+            }
         }
 
         function startPreviewCycle() {
@@ -1151,9 +1189,9 @@
             });
         }
 
-        async function logoutSession() {
+        async function logoutSession(event) {
             if (confirm("Logout and switch account?")) {
-                const btn = event.currentTarget || event.target;
+                const btn = event ? (event.currentTarget || event.target) : document.getElementById('logout-btn-nav');
                 const originalText = btn.innerText;
                 btn.innerText = "🔌 Clearing Session...";
                 btn.disabled = true;
