@@ -378,17 +378,24 @@ async def download_report():
     return FileResponse(path, filename="Campaign_Report.csv")
 
 @app.get("/download-template")
-async def download_template():
+async def download_template(format: str = "xlsx"):
     data = {
         "Country_Code": ["91", "44"],
         "Phone": ["9876543210", "7123456789"],
         "Name": ["Rahul", "John"],
-        "City": ["Mumbai", "London"]
+        "City": ["Mumbai", "London"],
+        "Notes": ["Order 123", "Interested"]
     }
     df = pd.DataFrame(data)
-    path = os.path.join(UPLOAD_DIR, "sample_template.xlsx")
-    df.to_excel(path, index=False)
-    return FileResponse(path, filename="WA_Bulk_Template.xlsx")
+    
+    if format == "csv":
+        path = os.path.join(UPLOAD_DIR, "sample_template.csv")
+        df.to_csv(path, index=False)
+        return FileResponse(path, filename="WA_Bulk_Template.csv", media_type="text/csv")
+    else:
+        path = os.path.join(UPLOAD_DIR, "sample_template.xlsx")
+        df.to_excel(path, index=False, engine='openpyxl')
+        return FileResponse(path, filename="WA_Bulk_Template.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.get("/logout")
 async def logout():

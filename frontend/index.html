@@ -564,9 +564,12 @@
                         <button type="button" onclick="switchSource('gsheet')" id="source-btn-gsheet" class="btn" style="flex:1; font-size: 0.75rem; padding: 8px; background: transparent; color: white;">Google Sheet</button>
                     </div>
 
-                    <div style="margin-bottom: 10px;">
-                        <a href="/download-template" class="btn" style="font-size: 0.65rem; padding: 4px 10px; background: rgba(255,255,255,0.05); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
-                            📥 Download Sample Template
+                    <div style="margin-bottom: 10px; display: flex; gap: 8px;">
+                        <a href="/download-template?format=xlsx" class="btn" style="flex: 1; font-size: 0.65rem; padding: 6px; background: rgba(255,255,255,0.05); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            📥 Excel Template
+                        </a>
+                        <a href="/download-template?format=csv" class="btn" style="flex: 1; font-size: 0.65rem; padding: 6px; background: rgba(255,255,255,0.05); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                            📄 CSV Template
                         </a>
                     </div>
 
@@ -615,8 +618,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Message</label>
-                    <textarea id="message" rows="5" placeholder="Type message... Use {{Name}} for personalization or {Hi|Hello} for Spintax." required
+                    <label>Message Content</label>
+                    <div style="background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(56, 189, 248, 0.1);">
+                        <p style="font-size: 0.7rem; color: var(--primary); font-weight: 600; margin-bottom: 4px;">💡 PRO TIPS:</p>
+                        <p style="font-size: 0.65rem; margin-bottom: 4px;">• <b>Personalize:</b> Use <code style="color: #fbbf24;">{{Name}}</code> to auto-insert names from your file.</p>
+                        <p style="font-size: 0.65rem;">• <b>Spintax:</b> Use <code style="color: #fbbf24;">{Hi|Hello|Hey}</code> to send a random variation (helps avoid bans).</p>
+                    </div>
+                    <textarea id="message" rows="5" placeholder="Example: {Hi|Hello} {{Name}}, check out our new update!" required
                         oninput="updatePreview()"></textarea>
                 </div>
 
