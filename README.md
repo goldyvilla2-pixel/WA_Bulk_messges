@@ -10,7 +10,22 @@ A powerful, human-mimicking WhatsApp bulk messaging tool built with FastAPI and 
 - **Image Support**: Send captions with image attachments.
 - **Automatic Resume**: Saves your login session locally.
 
-## 🛠️ Installation
+## 🛠️ Installation & Setup (Windows)
+
+The easiest way to start is by running the **`setup_and_run.bat`** file. It will automatically detect your environment.
+
+### 🚀 First-Time Setup (Common Issues)
+If you see an error saying "Python not found", it's usually because the **"Add to PATH"** checkbox was missed during installation.
+
+**How to Fix Python PATH:**
+1.  Uninstall Python (if already installed).
+2.  Download the latest installer from [python.org](https://www.python.org/downloads/).
+3.  **IMPORTANT:** On the first screen of the installer, check the box that says: **"Add Python 3.x to PATH"**.
+4.  Finish installation and run `setup_and_run.bat` again.
+
+**How to Fix Node.js PATH:**
+1.  Install Node.js (LTS version) from [nodejs.org](https://nodejs.org/).
+2.  After installation, **Restart your computer**. Windows needs a restart to update the PATH for Node.js.
 
 1. **Clone the repository**:
    ```bash
