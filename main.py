@@ -360,6 +360,9 @@ async def start_bulk(
         with open(image_path, "wb") as f:
             f.write(await image.read())
 
+    if sending_status["is_running"]:
+        return {"status": "error", "message": "A campaign is already running. Please stop or wait for it to finish."}
+
     background_tasks.add_task(bulk_send_task, final_items, messages, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start)
     return {"status": "started", "total": len(final_items)}
 

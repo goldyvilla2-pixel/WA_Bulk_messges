@@ -853,20 +853,42 @@
     <script>
         let logsIdx = 0;
         let isAlerting = false;
+        let lastFailedId = null; // Tracks if we already alerted for this specific failure
         let currentItems = []; // Store parsed items locally for start
         const alarmSound = new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3');
         alarmSound.loop = true;
 
-        function dismissAlert() {
+        let failedRowIdx = -1; // Tracks which row failed so we can skip it on resume
+
+        async function dismissAlert() {
             document.getElementById('fail-overlay').style.display = 'none';
             alarmSound.pause();
             alarmSound.currentTime = 0;
             isAlerting = false;
+            
+            // "once i click i understand then it should move to next number"
+            if (failedRowIdx !== -1 && currentItems.length > 0) {
+                const remainingItems = currentItems.slice(failedRowIdx);
+                if (remainingItems.length > 0) {
+                    console.log(`🚀 Resuming from row ${failedRowIdx + 1}...`);
+                    // We need to temporarily store currentItems, clear them for the call, then restore
+                    const backup = [...currentItems];
+                    currentItems = remainingItems;
+                    await startCampaign();
+                    currentItems = backup;
+                }
+            }
+            failedRowIdx = -1;
         }
 
         function triggerFailureAlert(row, phone, reason) {
-            if (isAlerting) return;
+            const errorId = `${row}_${phone}`;
+            if (isAlerting || lastFailedId === errorId) return;
+            
             isAlerting = true;
+            lastFailedId = errorId;
+            failedRowIdx = parseInt(row); // If Row 3 failed, index 3 is actually Row 4
+            
             document.getElementById('fail-row').innerText = row;
             document.getElementById('fail-phone').innerText = phone;
             document.getElementById('fail-reason').innerText = reason;
@@ -1084,6 +1106,7 @@
         }
 
         async function startCampaign() {
+            lastFailedId = null; // Clear old alerts before starting new task
             const formData = new FormData();
             
             // If items were parsed locally
@@ -1131,6 +1154,7 @@
                 if (data.success) {
                     currentItems = [];
                     logsIdx = 0;
+                    lastFailedId = null; // Reset error tracker
                     document.getElementById('file_source').value = '';
                     document.getElementById('file-label').innerText = 'Select CSV or Excel';
                     document.getElementById('clear-file').style.display = 'none';

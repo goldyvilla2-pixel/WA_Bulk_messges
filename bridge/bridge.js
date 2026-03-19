@@ -139,7 +139,16 @@ app.post('/send', async (req, res) => {
     }
 
     try {
-        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+        const getValidChatId = async (p) => {
+            try {
+                const id = await client.getNumberId(p);
+                return id ? id._serialized : (p.includes('@c.us') ? p : `${p}@c.us`);
+            } catch (e) {
+                return p.includes('@c.us') ? p : `${p}@c.us`;
+            }
+        };
+
+        const chatId = await getValidChatId(phone);
 
         // Anti-Ban measure: Simulate typing
         try {
@@ -170,7 +179,7 @@ app.post('/send', async (req, res) => {
             }
         };
 
-        let retries = 5;
+        let retries = 1; // User requested: "no need to try again" on error
         let lastError = null;
 
         while (retries > 0) {
@@ -179,8 +188,14 @@ app.post('/send', async (req, res) => {
                 return res.json({ status: 'success', success: true });
             } catch (e) {
                 lastError = e;
-                if (e.message && (e.message.includes('detached Frame') || e.message.includes('Execution context') || e.message.includes('Navigating'))) {
-                    console.log(`⚠️ Browser sync issue. Retrying send for ${phone}... (${retries - 1} left)`);
+                const errMsg = e.message || "";
+                if (errMsg.includes('detached Frame') || 
+                    errMsg.includes('Execution context') || 
+                    errMsg.includes('Navigating') || 
+                    errMsg.includes('getChat') ||
+                    errMsg.includes('Protocol error')) {
+                    
+                    console.log(`⚠️ Browser/Internal glitch (${errMsg}). Retrying send for ${phone}... (${retries - 1} left)`);
                     retries--;
                     if (retries > 0) {
                         await new Promise(r => setTimeout(r, 5000)); // wait 5s for re-attachment
@@ -197,10 +212,27 @@ app.post('/send', async (req, res) => {
     } catch (err) {
         console.error('❌ Failed to send:', err);
         let errorMsg = err.message || "Unknown error";
-        if (errorMsg.includes('detached Frame') || errorMsg.includes('Execution context')) {
-            errorMsg = "Browser sync error (Detached Frame). Retries exhausted. Client may be disconnected.";
+        if (errorMsg.includes('detached Frame') || errorMsg.includes('Execution context') || errorMsg.includes('getChat')) {
+            errorMsg = `WhatsApp internal sync error (${errorMsg.includes('getChat') ? 'getChat undefined' : 'Detached Frame'}). Retries exhausted. Please try again or refresh the session.`;
         }
         res.status(500).json({ success: false, error: errorMsg });
+    }
+});
+
+// Endpoint to simulate typing separately (if needed by main.py)
+app.get('/typing', async (req, res) => {
+    const { phone, duration } = req.query;
+    if (!isReady) return res.status(503).json({ error: 'Bridge not ready' });
+    
+    try {
+        const chatId = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+        await client.sendPresenceUpdate('composing', chatId);
+        setTimeout(async () => {
+            try { await client.sendPresenceUpdate('paused', chatId); } catch(e) {}
+        }, (duration || 2) * 1000);
+        res.json({ success: true });
+    } catch (e) {
+        res.json({ success: false, error: e.message });
     }
 });
 
