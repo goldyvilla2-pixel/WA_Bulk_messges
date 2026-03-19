@@ -932,6 +932,7 @@
                 const resp = await fetch('/parse-source', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (data.status === 'success' && data.count > 0) {
+                    currentItems = data.items;
                     document.getElementById('contacts-display').style.display = 'flex';
                     document.getElementById('count-badge').innerText = data.count;
                     document.getElementById('val-total').innerText = data.count;
@@ -954,6 +955,7 @@
                 const resp = await fetch('/parse-source', { method: 'POST', body: formData });
                 const data = await resp.json();
                 if (data.status === 'success' && data.count > 0) {
+                    currentItems = data.items;
                     document.getElementById('contacts-display').style.display = 'flex';
                     document.getElementById('count-badge').innerText = data.count;
                     document.getElementById('val-total').innerText = data.count;
@@ -1102,11 +1104,11 @@
             }
             formData.append('messages_json', JSON.stringify(messages));
             formData.append('delay', document.getElementById('delay').value);
-            formData.append('brand', document.getElementById('brand_name').value);
             formData.append('btn_text', document.getElementById('btn_text').value);
             formData.append('btn_url', document.getElementById('btn_url').value);
             formData.append('use_spintax', document.getElementById('use_spintax').checked);
             formData.append('use_safe_start', document.getElementById('use_safe_start').checked);
+
 
             if (document.getElementById('image').files[0]) {
                 formData.append('image', document.getElementById('image').files[0]);
