@@ -154,59 +154,59 @@ app.post('/send', async (req, res) => {
         try {
             console.log(`⏳ Simulating typing for ${phone}...`);
             await client.sendPresenceUpdate('composing', chatId);
-            // Random typing duration between 3 to 7 seconds
-            await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+            await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
             await client.sendPresenceUpdate('paused', chatId);
         } catch (presenceErr) {
             console.log('Presence update failed (non-critical):', presenceErr.message);
         }
 
-        const attemptSend = async () => {
+        const attemptSend = async (targetId) => {
             let finalMessage = message;
-            
-            // Append Smart-CTA Link if present (Safe for Non-API accounts)
             if (cta_text && cta_url) {
                 finalMessage += `\n\n_________________________\n🔗 *${cta_text}*\n${cta_url}`;
             }
 
             if (imagePath && fs.existsSync(imagePath)) {
                 const media = MessageMedia.fromFilePath(imagePath);
-                await client.sendMessage(chatId, media, { caption: finalMessage });
-                console.log(`🖼️ Sent image+caption to ${phone}`);
+                await client.sendMessage(targetId, media, { caption: finalMessage });
             } else {
-                await client.sendMessage(chatId, finalMessage);
-                console.log(`✍️ Sent text to ${phone}`);
+                await client.sendMessage(targetId, finalMessage);
             }
         };
 
-        let retries = 1; // User requested: "no need to try again" on error
+        let retries = 3; 
         let lastError = null;
+        let currentChatId = chatId;
 
         while (retries > 0) {
             try {
-                await attemptSend();
+                await attemptSend(currentChatId);
                 return res.json({ status: 'success', success: true });
             } catch (e) {
                 lastError = e;
                 const errMsg = e.message || "";
+                
+                // If it's a sync error, try to re-validate the ID and wait
                 if (errMsg.includes('detached Frame') || 
                     errMsg.includes('Execution context') || 
-                    errMsg.includes('Navigating') || 
                     errMsg.includes('getChat') ||
+                    errMsg.includes('LID') || 
                     errMsg.includes('Protocol error')) {
                     
-                    console.log(`⚠️ Browser/Internal glitch (${errMsg}). Retrying send for ${phone}... (${retries - 1} left)`);
                     retries--;
+                    console.log(`⚠️ Sync glitch detected (${errMsg}). Retry ${3-retries}/3 for ${phone}...`);
+                    
                     if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 5000)); // wait 5s for re-attachment
+                        await new Promise(r => setTimeout(r, 3000)); // Cool down
+                        // Try to re-fetch ID in case it was a session desync
+                        currentChatId = await getValidChatId(phone);
                     }
                 } else {
+                    // Fatal error (like "Session Closed") - don't retry
                     throw e;
                 }
             }
         }
-
-        // If we get here, all retries failed
         throw lastError;
 
     } catch (err) {

@@ -144,7 +144,8 @@ def apply_variables(text: str, vars_dict: dict) -> str:
 
 def bulk_send_task(items: List[dict], messages: List[str], image_path: str, delay: int, 
                    btn_text: str = "", btn_url: str = "", 
-                   use_spintax: bool = False, use_safe_start: bool = False):
+                   use_spintax: bool = False, use_safe_start: bool = False,
+                   auto_skip: bool = False):
     global sending_status
     sending_status["is_running"] = True
     sending_status["total"] = len(items)
@@ -239,10 +240,14 @@ def bulk_send_task(items: List[dict], messages: List[str], image_path: str, dela
             sending_status["campaign_report"].append({
                 "phone": phone, "status": "Failed", "error": err_msg, "row": i+1, **vars
             })
-            sending_status["step"] = "stopped_on_error"
-            sending_status["logs"].append("🚨 Engine STOPPED due to failure.")
-            sending_status["is_running"] = False
-            break
+            
+            if not auto_skip:
+                sending_status["step"] = "stopped_on_error"
+                sending_status["logs"].append("🚨 Engine STOPPED due to failure.")
+                sending_status["is_running"] = False
+                break
+            else:
+                sending_status["logs"].append("⏩ Auto-Skip: Continuing to next number...")
 
         if i < len(items) - 1:
             # 4. Safe Start (Warmup Mode)
@@ -312,6 +317,7 @@ async def start_bulk(
     btn_url: str = Form(""),
     use_spintax: bool = Form(False),
     use_safe_start: bool = Form(False),
+    auto_skip: bool = Form(False),
     image: UploadFile = File(None),
     file_source: UploadFile = File(None)
 ):
@@ -363,7 +369,7 @@ async def start_bulk(
     if sending_status["is_running"]:
         return {"status": "error", "message": "A campaign is already running. Please stop or wait for it to finish."}
 
-    background_tasks.add_task(bulk_send_task, final_items, messages, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start)
+    background_tasks.add_task(bulk_send_task, final_items, messages, image_path, delay, btn_text, btn_url, use_spintax, use_safe_start, auto_skip)
     return {"status": "started", "total": len(final_items)}
 
 @app.post("/parse-source")

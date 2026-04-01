@@ -662,10 +662,17 @@
                             <span class="slider round"></span>
                         </label>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <label style="margin:0;">Safe-Start 🔥</label>
                         <label class="switch">
                             <input type="checkbox" id="use_safe_start" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="margin:0;">Auto-Skip Failures ⏩</label>
+                        <label class="switch">
+                            <input type="checkbox" id="auto_skip">
                             <span class="slider round"></span>
                         </label>
                     </div>
@@ -868,14 +875,15 @@
             
             // "once i click i understand then it should move to next number"
             if (failedRowIdx !== -1 && currentItems.length > 0) {
-                const remainingItems = currentItems.slice(failedRowIdx);
-                if (remainingItems.length > 0) {
-                    console.log(`🚀 Resuming from row ${failedRowIdx + 1}...`);
-                    // We need to temporarily store currentItems, clear them for the call, then restore
-                    const backup = [...currentItems];
-                    currentItems = remainingItems;
+                // Permanently update local list to exclude the numbers before/at failure
+                // If Row 1 failed (failedRowIdx=1), slice(1) takes index 1 onwards (Number 2)
+                currentItems = currentItems.slice(failedRowIdx);
+                
+                if (currentItems.length > 0) {
+                    console.log(`🚀 Resuming engine from next available number...`);
                     await startCampaign();
-                    currentItems = backup;
+                } else {
+                    console.log("🏁 No more numbers to process.");
                 }
             }
             failedRowIdx = -1;
@@ -1131,6 +1139,7 @@
             formData.append('btn_url', document.getElementById('btn_url').value);
             formData.append('use_spintax', document.getElementById('use_spintax').checked);
             formData.append('use_safe_start', document.getElementById('use_safe_start').checked);
+            formData.append('auto_skip', document.getElementById('auto_skip').checked);
 
 
             if (document.getElementById('image').files[0]) {
